@@ -37,7 +37,7 @@ def csv_to_txt(inputFile, outputFile, rmNumFlag:bool = False):
             # Split the line by commas and exclude the last element (correct answer)
             parts = line.split(',')[:-1]
             # Join the parts back into a string
-            formattedLine = ' '.join(parts).replace('\n', '') + ' -- The correct answer is: \n'
+            formattedLine = ' '.join(parts).replace('\n', '') + ' ... The correct answer is: \n'
             outfile.write(formattedLine)
 
         print("Conversion complete")
