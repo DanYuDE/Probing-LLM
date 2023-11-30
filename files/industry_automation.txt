@@ -1,4 +1,3 @@
-question,choice_A,choice_B,choice_C,choice_D,correct_answer
 76. The primary focus of the ?????systems approach????? to the problems of business and industry is to improve,A. organizational performance,B. work habits,C. organizational morale,D. individual morale,A
 170. An industry that create a lot of waste is:,A. Solar Power Companies,B. Recycling companies,C. water production companies,D. Cleaning Companies,D
 174. Which of the following is NOT a characteristic of perfectly competitive industry?,A. Free entry into the industry.,B. Product differentiation.,C. Perfectly elastic demand curve.,D. Homogeneous products.,B

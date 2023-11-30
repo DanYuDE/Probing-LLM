@@ -31,6 +31,7 @@ def Execution():
                                     print_block=True,
                                     filename=outputFile, query_id=query_id)
 
+            print(query_id)
             query_id += 1
 
 
