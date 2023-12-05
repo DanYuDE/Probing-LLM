@@ -33,13 +33,13 @@ def csv_to_txt(inputFile, outputFile, rmNumFlag:bool = False):
         for line in infile:
             # Remove the leading number and period
             if rmNumFlag is True:
-            	line = line.split(". ", 1)[-1]
+                line = line.split(". ", 1)[-1]
             # Split the line by commas and exclude the last element (correct answer)
             parts = line.split(',')[:-1]
             # Join the parts back into a string
-            formattedLine = ' '.join(parts).replace('\n', '') + ' ... The correct answer is: \n'
+            formattedLine = ' '.join(parts).replace('\n', '') + '. The correct answer is'
             outfile.write(formattedLine)
 
         print("Conversion complete")
 
-csv_to_txt('../files/industry_automation.txt', '../files/industry_automation_nAns.txt') # need to be modified
+csv_to_txt('../files/industry_automation.txt', '../files/modified_industry_automation_nAns.txt') # need to be modified

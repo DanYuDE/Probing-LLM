@@ -18,7 +18,7 @@ question,choice_A,choice_B,choice_C,choice_D
 17. The metal surfaces for electrical resistance welding must be,A. rough.,B. clean.,C. moistened,D. coloured
 18. Which system is also known as automatic control system?,A. Open loop control system,B. Closed loop control system,C. Either A or B,D. Nether A nor B
 19.  These store goods for moderate to long periods:,A. Storage warehouses.,B. Distribution centres.,C. Haulage transport.,D. Electronic data interchange.
-20. Which of the following is a clustering algorithm in machine learning?,A. Expectation Maximization,B. CART,C. Gaussian Na??ve Bayes,D. Apriori
+20. Which of the following is a clustering algorithm in machine learning?,A. Expectation Maximization,B. CART,C. Gaussian Naive Bayes,D. Apriori
 21. What is the first step in designing a product?,A. model a solution,B. communicate the solution,C. identify the need or want,D. build a prototype
 22. A car-manufacturing factory is considering a new site for its next plant. Which of the following would community planners be most concerned with before allowing the plant to be built?,A. The amount of materials stored in the plant,B. The hours of operations of the new plant,C. The effect the plant will have on the environment,D. The work environment for the employees at the plant
 23. Given a Neural Net with N input nodes,A.  no hidden layers,"B.  one output node, with Entropy Loss and Sigmoid Activation Functions, which of the following algorithms (with the proper hyper-parameters and initialization) can be used to find the global optimum?,Stochastic Gradient Descent,Mini-Batch Gradient Descent",C. Batch Gradient Descent,D. All of the above

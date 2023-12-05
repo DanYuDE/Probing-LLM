@@ -17,8 +17,13 @@ token = "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"  # huggingface token
 #
 #         Output:"""
 
-textfile = '../files/all_data_nNum.txt'
-outputFile = 'allresult.csv'
+textfile = '../files/modified_industry_automation_nAns.txt'
+outputFile = 'test.csv'
+
+"""
+"Follow the question and given input choices to give the correct output answer from the input: "+ text -> filtered_wInstructions.csv
+text="Review the question, evaluate the given options, and select an option as the correct answer: "+ text -> new_filtered.csv
+"""
 def Execution():
     model = Llama7BHelper(token)
     with open(textfile, 'r') as file:
@@ -26,7 +31,15 @@ def Execution():
         query_id = 1
         clear_csv(outputFile)
         for text in texts:
-            model.decode_all_layers(text=text, print_intermediate_res=True,
+            model.decode_all_layers(text="Review the question, evaluate the given options, and select an option as "
+                                         "the correct answer."
+                                         "e.g. Question: Which of the following is a clustering algorithm in machine learning? "
+                                         "Input: A. Expectation Maximization B. CART C. Gaussian Naive Bayes D. Apriori. "
+                                         "The correct answer is A. "
+                                         "Question: The primary focus of the ?????systems approach????? to the problems of business and industry is to improve: "
+                                         "Input: A. organizational performance B. work habits C. organizational morale D. individual morale. "
+                                         "The correct answer is",
+                                    print_intermediate_res=True,
                                     print_mlp=True,
                                     print_block=True,
                                     filename=outputFile, query_id=query_id)
