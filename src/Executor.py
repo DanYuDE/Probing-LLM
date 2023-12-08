@@ -7,18 +7,8 @@ import torch
 
 token = "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"  # huggingface token
 
-# text = """
-#         Instruction: The wheels and gears of a machine are greased in order to decrease what?
-#         Input:
-#         A.potential energy
-#         B.efficiency
-#         C.output
-#         D.friction
-#
-#         Output:"""
-
-textfile = '../files/modified_industry_automation_nAns.txt'
-outputFile = 'test.csv'
+textfile = '../files/question_ia_new.txt'
+outputFile = '../output/result5.csv'
 
 """
 "Follow the question and given input choices to give the correct output answer from the input: "+ text -> filtered_wInstructions.csv
@@ -28,24 +18,18 @@ def Execution():
     model = Llama7BHelper(token)
     with open(textfile, 'r') as file:
         texts = file.readlines()
-        query_id = 1
+        query = 1
         clear_csv(outputFile)
         for text in texts:
-            model.decode_all_layers(text="Review the question, evaluate the given options, and select an option as "
-                                         "the correct answer."
-                                         "e.g. Question: Which of the following is a clustering algorithm in machine learning? "
-                                         "Input: A. Expectation Maximization B. CART C. Gaussian Naive Bayes D. Apriori. "
-                                         "The correct answer is A. "
-                                         "Question: The primary focus of the ?????systems approach????? to the problems of business and industry is to improve: "
-                                         "Input: A. organizational performance B. work habits C. organizational morale D. individual morale. "
-                                         "The correct answer is",
-                                    print_intermediate_res=True,
-                                    print_mlp=True,
-                                    print_block=True,
-                                    filename=outputFile, query_id=query_id)
+            print(text)
+            model.decode_all_layers(text="Review the question, evaluate the given options(A., B., C., D., etc.), and select an option as the correct answer: " + text,
+                                print_intermediate_res=True,
+                                print_mlp=True,
+                                print_block=True,
+                                filename=outputFile)
 
-            print(query_id)
-            query_id += 1
+            print(query)
+            query += 1
 
 
     # model.reset_all()

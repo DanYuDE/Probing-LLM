@@ -67,7 +67,7 @@ class Llama7BHelper:
     def __init__(self, token):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf", use_auth_token=token)
-        self.model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-hf", output_attentions=True, use_auth_token=token).to(
+        self.model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-hf", use_auth_token=token).to(
             self.device)
         for i, layer in enumerate(self.model.model.layers):
             self.model.model.layers[i] = BlockOutputWrapper(layer, self.model.lm_head, self.model.model.norm)
@@ -115,7 +115,7 @@ class Llama7BHelper:
         return decoded_output
 
     def decode_all_layers(self, text, filename, print_attn_mech=True, print_intermediate_res=True, print_mlp=True,
-                          print_block=True, query_id=0):
+                          print_block=True):
         self.get_logits(text)
         dic = {}
         for i, layer in enumerate(self.model.model.layers):
@@ -143,14 +143,14 @@ class Llama7BHelper:
                 decoded_output = self.print_decoded_activations(layer.block_output_unembedded, 'Block output')
                 dic[f'layer{i}']['Block output'].extend(decoded_output[1:])
 
-        write_to_csv(dic, filename, query_id)
+        write_to_csv(dic, filename)
 
 
 def clear_csv(filename):
     # Clear the contents of the CSV file
     open(filename, 'w').close()
 
-def write_to_csv(data, filename, query_id=1):
+def write_to_csv(data, filename):
     data_for_df = []
     for layer, layer_data in data.items():
         layer_dict = {
@@ -165,8 +165,8 @@ def write_to_csv(data, filename, query_id=1):
 
     df = pd.DataFrame(data_for_df)
     print(df)
-    empty_row = pd.DataFrame({col: [''] for col in df.columns}, index=[df.index[-1] + 1])
-    df = pd.concat([df, empty_row], ignore_index=True)
+    # empty_row = pd.DataFrame({col: [''] for col in df.columns}, index=[df.index[-1] + 1])
+    # df = pd.concat([df, empty_row], ignore_index=True)
     df.set_index('Layer', inplace=True)  # Set the 'Layer' column as the index
     df.to_csv(filename, mode='a', index=True)
 

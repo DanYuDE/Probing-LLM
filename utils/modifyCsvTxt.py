@@ -42,4 +42,4 @@ def csv_to_txt(inputFile, outputFile, rmNumFlag:bool = False):
 
         print("Conversion complete")
 
-csv_to_txt('../files/industry_automation.txt', '../files/modified_industry_automation_nAns.txt') # need to be modified
+csv_to_txt('../files/industry_automation.txt', '../files/ia.txt', True) # need to be modified
