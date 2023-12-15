@@ -74,10 +74,10 @@ class Llama7BHelper:
 
         self.first_write = True
 
-    def generate_text(self, prompt, max_length=100):
+    def generate_text(self, prompt, max_length=100, temperature=0):
         inputs = self.tokenizer(prompt, return_tensors="pt")
         print("Tokens:", self.tokenizer.convert_ids_to_tokens(inputs.input_ids[0]))
-        generate_ids = self.model.generate(inputs.input_ids.to(self.device), max_length=max_length)
+        generate_ids = self.model.generate(inputs.input_ids.to(self.device), max_length=max_length, temperature=temperature)
         return self.tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[
             0]
 
@@ -162,7 +162,6 @@ def write_to_csv(data, filename):
         }
 
         data_for_df.append(layer_dict)
-
     df = pd.DataFrame(data_for_df)
     print(df)
     # empty_row = pd.DataFrame({col: [''] for col in df.columns}, index=[df.index[-1] + 1])
@@ -170,7 +169,6 @@ def write_to_csv(data, filename):
     df.set_index('Layer', inplace=True)  # Set the 'Layer' column as the index
     df.to_csv(filename, mode='a', index=True)
 
-    # print(df.head())
 
    # def plot_attention_heatmap(self, attention, tokens, layer_num, head_num, ax):
     #     sns.heatmap(attention, xticklabels=tokens, yticklabels=tokens, cmap='viridis', ax=ax)
