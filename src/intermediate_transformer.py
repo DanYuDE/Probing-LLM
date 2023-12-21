@@ -1,10 +1,12 @@
+# import os
+# os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0" // for mps
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-import os
+import json
 
 class AttnWrapper(torch.nn.Module):
     def __init__(self, attn):
@@ -65,21 +67,22 @@ class BlockOutputWrapper(torch.nn.Module):
 
 class Llama7BHelper:
     def __init__(self, token):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        # self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        # self.device = "mps" if torch.backends.mps.is_available() else "cpu"
+        # self.device = torch.device("mps")
+        self.device = torch.device("cpu")
         self.tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf", use_auth_token=token)
-        self.model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-hf", use_auth_token=token).to(
-            self.device)
+        self.model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-hf", use_auth_token=token).to(self.device)
         for i, layer in enumerate(self.model.model.layers):
             self.model.model.layers[i] = BlockOutputWrapper(layer, self.model.lm_head, self.model.model.norm)
 
         self.first_write = True
 
-    def generate_text(self, prompt, max_length=100, temperature=0):
+    def generate_text(self, prompt, max_length=100): #, temperature=1):
         inputs = self.tokenizer(prompt, return_tensors="pt")
         print("Tokens:", self.tokenizer.convert_ids_to_tokens(inputs.input_ids[0]))
-        generate_ids = self.model.generate(inputs.input_ids.to(self.device), max_length=max_length, temperature=temperature)
-        return self.tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[
-            0]
+        generate_ids = self.model.generate(inputs.input_ids.to(self.device), max_length=max_length) #, temperature=temperature)
+        return self.tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 
     def get_logits(self, prompt):
         inputs = self.tokenizer(prompt, return_tensors="pt")
@@ -143,7 +146,7 @@ class Llama7BHelper:
                 decoded_output = self.print_decoded_activations(layer.block_output_unembedded, 'Block output')
                 dic[f'layer{i}']['Block output'].extend(decoded_output[1:])
 
-        write_to_csv(dic, filename)
+        write_to_json(dic, filename)
 
 
 def clear_csv(filename):
@@ -168,6 +171,27 @@ def write_to_csv(data, filename):
     # df = pd.concat([df, empty_row], ignore_index=True)
     df.set_index('Layer', inplace=True)  # Set the 'Layer' column as the index
     df.to_csv(filename, mode='a', index=True)
+
+
+def write_to_json(data, filename):
+    data_for_df = []
+    for layer, layer_data in data.items():
+        layer_dict = {
+            'Layer': layer,
+            'Attention mechanism': layer_data['Attention mechanism'],
+            'Intermediate residual stream': layer_data['Intermediate residual stream'],
+            'MLP output': layer_data['MLP output'],
+            'Block output': layer_data['Block output']
+        }
+        data_for_df.append(layer_dict)
+
+    # Convert the list of dictionaries into a JSON string
+    json_string = json.dumps(data_for_df, indent=4)
+    print(json_string)
+
+    # Write the JSON string to a file
+    with open(filename, 'a') as file:
+        file.write(json_string)
 
 
    # def plot_attention_heatmap(self, attention, tokens, layer_num, head_num, ax):
