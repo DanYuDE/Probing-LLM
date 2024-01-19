@@ -1,247 +1,224 @@
 import pandas as pd
-import matplotlib.pyplot as plt
 import ast
 import numpy as np
-from plotly.offline import plot
-import plotly.graph_objects as go
 import dash
-from dash import Dash, html, dcc, Input, Output, callback, State
-from plotly.graph_objs import Figure
+from dash import Dash, html, dcc, Input, Output, State, callback
+import plotly.graph_objects as go
+import os
 
-# Initialize the Dash app
-app = Dash(__name__, suppress_callback_exceptions=True)
+sampleText = """<<SYS>>
+Role and goal: 
+Your role is to act as an intelligent problem-solver, tasked with selecting the correct answer from a set of multiple-choice options. Your goal is to carefully analyze the question and each of the provided options, applying your extensive knowledge base and reasoning skills to determine the most accurate and appropriate answer.
 
-file_path = '../output/test.json'
-# data = pd.read_csv(file_path)
-data = pd.read_json(file_path)
-# print(len(data))
-num_layers_per_set = len(data)
-num_sets = int(len(data)/num_layers_per_set)
-print(num_sets)
-# Layout of the app
-app.layout = html.Div([
-    dcc.Dropdown(
-        id='set-selector',
-        options=[{'label': f'Set {i + 1}', 'value': i} for i in range(num_sets)],
-        value=0
-    ),
-    html.Div(id='graphs-container')
-])
+Context:
+The input text is a question with multiple-choice options. The correct answer is indicated by the option label A, B, C, or D.
+1. Question: A clear query requiring a specific answer.
+2. Options: A list of possible answers labeled with possible answer A.First possible answer B.Second possible answer C.Third possible answer D.Fourth possible answer
 
+Instructions:
+Analyze the question and options provided.
+Use your knowledge to assess each option.
+Employ reasoning to eliminate clearly incorrect options.
+Identify the most accurate answer based on the information given.
+Conclude by justifying your selection, clearly indicating your choice by referencing the option label A, B, C, or D.
+You should only output one capitalized letter indicating the correct answer.
 
-def extractWeightsCSV(data, startLine, numLayers, column_name):
-    weight = {}
-    for i in range(startLine, startLine + numLayers):
-        layer = data.iloc[i]['Layer']
-        t_wList = ast.literal_eval(data.iloc[i][column_name])
-        tokens, weights = zip(*t_wList)
-        weight[layer] = (tokens, weights)
-    return weight
+Example:
+Input: // you will receive the question and options here.
+Output: The correct answer is {one of A, B, C, D} // you will output the correct answer, replace {one of A, B, C, D} with the correct option label A, B, C, or D.
 
-def extractWeightsJSON(data, startLine, numLayers, column_name):
-    weight = {}
-    for i in range(startLine, startLine + numLayers):
-        layer = data.iloc[i]['Layer']
-        t_wList = data.iloc[i][column_name]
-        tokens, weights = zip(*t_wList)
-        weight[layer] = (tokens, weights)
-    return weight
+Now you can start to answer the question with given options to give the correct answer.
+<</SYS>>
 
-def create_interactive_heatmap(tokenWeights, set_num, title):
-    num_layers = len(tokenWeights)
-    max_tokens = max(len(weights[0]) for weights in tokenWeights.values())
-    heatmap_data = np.zeros((num_layers, max_tokens))
-    annotations = []
-    custom_hover_data = np.empty((num_layers, max_tokens), dtype=object)
+[INST] Input: {{inputText}}[/INST]
+Output: The correct answer is """
+class DashApp:
+    def __init__(self, sampleText):
+        self.app = Dash(__name__, suppress_callback_exceptions=True)
+        self.result_folder = '../result/'  # Update this path if necessary
+        self.csv_files = self.get_csv_files(self.result_folder)
+        self.file_path = os.path.join(self.result_folder, self.csv_files[0]) if self.csv_files else None
+        self.data = pd.read_csv(self.file_path) if self.file_path else pd.DataFrame()
+        self.num_layers_per_set = 32
+        self.num_sets = len(self.data) // (self.num_layers_per_set + 1) if not self.data.empty else 0
+        self.sentences = self.read_sentences('../files/outtest.txt')
+        self.sampleText = sampleText
+        self.setup_layout()
+        self.setup_callbacks()
 
-    for i, (layer, (tokens, weights)) in enumerate(tokenWeights.items()):
-        for j, weight in enumerate(weights):
-            heatmap_data[i, j] = weight
-            custom_hover_data[i][j] = f'Token: {tokens[j]}<br>Layer: {layer}<br>Confidence: {weight:.2f}'
-            annotations.append(
-                dict(
-                    showarrow=False,
-                    x=j,
-                    y=i,
-                    text=tokens[j],
-                    xref="x",
-                    yref="y",
-                    font=dict(color='white')
+    def get_csv_files(self, folder_path):
+        return [file for file in os.listdir(folder_path) if file.endswith('.csv')]
+
+    def read_sentences(self, file_path):
+        with open(file_path, 'r') as file:
+            sentences = file.read().strip().split('\n')
+        return sentences
+
+    def setup_layout(self):
+        self.app.layout = html.Div([
+            dcc.Dropdown(
+                id='file-selector',
+                options=[{'label': file, 'value': file} for file in self.csv_files],
+                value=self.csv_files[0] if self.csv_files else None
+            ),
+            dcc.Dropdown(
+                id='set-selector',
+                # The options will be generated dynamically in the callback
+                value=0
+            ),
+            html.Div(id='graphs-container'),
+        ])
+
+    def setup_callbacks(self):
+        @self.app.callback(
+            [Output('set-selector', 'options'),
+             Output('set-selector', 'value')],
+            [Input('file-selector', 'value')])
+        def update_set_selector(selected_file):
+            if selected_file is not None:
+                file_path = os.path.join(self.result_folder, selected_file)
+                self.data = pd.read_csv(file_path)  # Update the data
+                self.num_sets = len(self.data) // (self.num_layers_per_set + 1)
+                # Reset set-selector options and value
+                return ([{'label': f'Set {i + 1}', 'value': i} for i in range(self.num_sets)], 0)
+            # In case of None or error
+            return ([], None)
+
+        @self.app.callback(
+            Output('graphs-container', 'children'),
+            [Input('set-selector', 'value'),
+             Input('file-selector', 'value')])
+        def update_graphs(set_num, selected_file):
+            if selected_file is None or set_num is None:
+                return html.Div()  # Return an empty div if no file is selected or no set number is provided
+
+            # Update file_path and data if a new file is selected
+            file_path = os.path.join(self.result_folder, selected_file)
+            self.data = pd.read_csv(file_path)
+
+            start_line = set_num * (self.num_layers_per_set + 1)
+            attention_weights = self.extractWeightsCSV(self.data, start_line, self.num_layers_per_set,
+                                                       'Attention mechanism')
+            blockOutput = self.extractWeightsCSV(self.data, start_line, self.num_layers_per_set, 'Block output')
+
+            att_fig = self.create_interactive_heatmap(attention_weights,
+                                                      f"Attention Probing Visualization - Set {set_num + 1}")
+            block_fig = self.create_interactive_heatmap(blockOutput, f"Block Output Visualization - Set {set_num + 1}")
+
+            sentence = self.sampleText.replace("{{inputText}}", self.sentences[set_num]) if set_num < len(
+                self.sentences) else "No sentence available."
+
+            return html.Div(style={'display': 'flex', 'flex-direction': 'column'}, children=[
+                html.Div(style={'display': 'flex'}, children=[
+                    html.Div(style={'width': '50%', 'marginBottom': '20px'}, children=[
+                        dcc.Graph(figure=att_fig, id='att-heatmap'),
+                        html.Div(id='att-hover-info', style={'textAlign': 'center', 'marginTop': '10px'})
+                    ]),
+                    html.Div(style={'width': '50%', 'marginBottom': '20px'}, children=[
+                        dcc.Graph(figure=block_fig, id='block-heatmap'),
+                        html.Div(id='block-hover-info', style={'textAlign': 'center', 'marginTop': '10px'})
+                    ])
+                ]),
+                html.Div(sentence, style={'width': '100%', 'textAlign': 'left', 'marginTop': '20px'})
+            ])
+
+        @self.app.callback(
+            [Output('att-hover-info', 'children'),
+             Output('block-hover-info', 'children')],
+            [Input('att-heatmap', 'hoverData'),
+             Input('block-heatmap', 'hoverData')],
+            [State('att-heatmap', 'figure'),
+             State('block-heatmap', 'figure'),
+             State('att-hover-info', 'children'),
+             State('block-hover-info', 'children')]
+        )
+        def update_hover_info(att_hoverData, block_hoverData, att_fig_dict, block_fig_dict, att_info_text, block_info_text):
+            ctx = dash.callback_context
+            if not ctx.triggered:
+                return dash.no_update
+
+            trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+            att_info = att_info_text if att_info_text is not None else "Hover on Attention Heatmap for info."
+            block_info = block_info_text if block_info_text is not None else "Hover on Block Output Heatmap for info."
+
+            if trigger_id == 'att-heatmap' and att_hoverData:
+                hovered_layer = int(att_hoverData['points'][0]['y'])
+                hovered_index = int(att_hoverData['points'][0]['x'])
+                att_hovertext = att_fig_dict['data'][0]['hovertext'][hovered_layer][hovered_index]
+                att_info = f"Hovered on Attention Heatmap: {att_hovertext.replace('<br>', ', ')}"
+                block_hovertext = block_fig_dict['data'][0]['hovertext'][hovered_layer][hovered_index]
+                block_info = f"Hovered on Block Output Heatmap: {block_hovertext.replace('<br>', ', ')}"
+
+            elif trigger_id == 'block-heatmap' and block_hoverData:
+                hovered_layer = int(block_hoverData['points'][0]['y'])
+                hovered_index = int(block_hoverData['points'][0]['x'])
+                block_hovertext = block_fig_dict['data'][0]['hovertext'][hovered_layer][hovered_index]
+                block_info = f"Hovered on Block Output Heatmap: {block_hovertext.replace('<br>', ', ')}"
+                att_hovertext = att_fig_dict['data'][0]['hovertext'][hovered_layer][hovered_index]
+                att_info = f"Hovered on Attention Heatmap: {att_hovertext.replace('<br>', ', ')}"
+
+            return att_info, block_info
+
+    def extractWeightsCSV(self, data, startLine, numLayers, column_name):
+        weight = {}
+        for i in range(startLine, startLine + numLayers):
+            layer = data.iloc[i]['Layer']
+            t_wList = ast.literal_eval(data.iloc[i][column_name])
+            tokens, weights = zip(*t_wList)
+            weight[layer] = (tokens, weights)
+        return weight
+
+    def create_interactive_heatmap(self, tokenWeights, title):
+        num_layers = len(tokenWeights)
+        max_tokens = max(len(weights[0]) for weights in tokenWeights.values())
+        heatmap_data = np.zeros((num_layers, max_tokens))
+        annotations = []
+        hovertext = []  # Initialize an empty list for hovertext
+
+        for i, (layer, (tokens, weights)) in enumerate(tokenWeights.items()):
+            hovertext_row = []  # Initialize an empty list for this row
+            for j, weight in enumerate(weights):
+                heatmap_data[i, j] = weight
+                hovertext_cell = f'Token: {tokens[j]}<br>Layer: {layer}<br>Confidence: {weight:.2f}'
+                hovertext_row.append(hovertext_cell)  # Add cell hovertext to the row
+                annotations.append(
+                    dict(
+                        showarrow=False,
+                        x=j,
+                        y=i,
+                        text=tokens[j],
+                        xref="x",
+                        yref="y",
+                        font=dict(color='white')
+                    )
                 )
-            )
+            hovertext.append(hovertext_row)  # Add the completed row to hovertext
 
-    fig = go.Figure(data=go.Heatmap(
-        z=heatmap_data,
-        x=[f'{i}' for i in range(max_tokens)],
-        y=[f'{i}' for i in range(num_layers)],
-        colorscale='Viridis',
-        # hoverongaps=False
-        hoverongaps=False,
-        # hoverinfo='none',  # Disable default hoverinfo
-        text=custom_hover_data,  # Set custom hover text
-        hovertemplate='%{text}'  # Use custom text for hovertemplate
-    ))
+        fig = go.Figure(data=go.Heatmap(
+            z=heatmap_data,
+            x=[f'{i}' for i in range(max_tokens)],
+            y=[f'{i}' for i in range(num_layers)],
+            colorscale='Viridis',
+            hoverongaps=False,
+            hoverinfo='text',
+            hovertext=hovertext  # Make sure this is a list of lists.
+        ))
 
-    fig.update_layout(
-        title=title,
-        annotations=annotations,
-        xaxis=dict(ticks='', side='top'),
-        yaxis=dict(ticks=''),
-        width=900,  # Adjust as needed
-        height=900  # Adjust as needed
-    )
+        fig.update_layout(
+            title=title,
+            annotations=annotations,
+            xaxis=dict(ticks='', side='top'),
+            yaxis=dict(ticks=''),
+            width=900,
+            height=900
+        )
 
-    # fig.show()
-    # plot(fig, filename='heatmap.html', auto_open=True)
-    return fig
+        return fig
 
+    def run(self, debug=True):
+        self.app.run_server(debug=debug)
 
-def save_html_with_two_figures(att_fig, block_fig, file_name):
-    # Create an HTML string to hold both figures side by side
-    html_string = f"""
-    <html>
-    <head>
-        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    </head>
-    <body>
-        <div style="display: flex; justify-content: space-around;">
-            <div style="width: 45%;">{att_fig.to_html(full_html=False, include_plotlyjs='cdn')}</div>
-            <div style="width: 45%;">{block_fig.to_html(full_html=False, include_plotlyjs='cdn')}</div>
-        </div>
-    </body>
-    </html>
-    """
-
-    # Write the HTML string to a file
-    with open(file_name, 'w') as f:
-        f.write(html_string)
-
-
-# Callback to update graphs based on selected set
-@app.callback(
-    Output('graphs-container', 'children'),
-    Input('set-selector', 'value'))
-def update_graphs(set_num):
-    start_line = set_num * (num_layers_per_set + 1)  # +1 for header row
-    attention_weights = extractWeightsJSON(data, start_line, num_layers_per_set, 'Attention mechanism')
-    blockOutput = extractWeightsJSON(data, start_line, num_layers_per_set, 'Block output')
-
-    att_fig = create_interactive_heatmap(attention_weights, set_num,
-                                         f"Attention Probing Visualization - Set {set_num + 1}")
-    block_fig = create_interactive_heatmap(blockOutput, set_num, f"Block Output Visualization - Set {set_num + 1}")
-
-    return html.Div([
-        html.Div(dcc.Graph(figure=att_fig, id='att-heatmap'), style={'width': '50%', 'display': 'inline-block'}),
-        html.Div(dcc.Graph(figure=block_fig, id='block-heatmap'), style={'width': '50%', 'display': 'inline-block'})
-    ], style={'display': 'flex'})
-
-
-# Utility function to construct hover text for a given token
-def construct_hover_text(tokenWeights, hovered_token):
-    hover_texts = []
-    for layer, (tokens, weights) in tokenWeights.items():
-        layer_hover_texts = []
-        for token, weight in zip(tokens, weights):
-            if token == hovered_token:
-                layer_hover_texts.append(f"{token}<br>Layer: {layer}<br>Confidence: {weight} (Corresponding token)")
-            else:
-                layer_hover_texts.append(f"{token}<br>Layer: {layer}<br>Confidence: {weight}")
-        hover_texts.append(layer_hover_texts)
-    return hover_texts
-
-
-# Callback to synchronize hover data between the two graphs
-@app.callback(
-    Output('att-heatmap', 'figure'),
-    Output('block-heatmap', 'figure'),
-    Input('att-heatmap', 'hoverData'),
-    Input('block-heatmap', 'hoverData'),
-    State('set-selector', 'value'),
-    State('att-heatmap', 'figure'),
-    State('block-heatmap', 'figure'))
-def synchronize_hover(att_hoverData, block_hoverData, set_num, att_fig_dict, block_fig_dict):
-    ctx = dash.callback_context
-    if not ctx.triggered:
-        return att_fig_dict, block_fig_dict
-
-    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-
-    # Convert dictionary to Plotly Figure objects
-    att_fig = go.Figure(att_fig_dict)
-    block_fig = go.Figure(block_fig_dict)
-
-    try:
-        if trigger_id == 'att-heatmap' and att_hoverData:
-            hovered_token = att_hoverData['points'][0]['text'].split('<br>')[0].split(': ')[1]
-            print("hovered token = ", hovered_token)
-            hovered_layer = int(att_hoverData['points'][0]['y'])
-            hovered_index = int(att_hoverData['points'][0]['x'])
-            print(hovered_layer)
-            print(hovered_index)
-            # Update hovertext for the block heatmap based on the hovered token
-            # block_weights = extractWeights(data, set_num * (num_layers_per_set + 1), num_layers_per_set, 'Block output')
-            # print("block weights = ", block_weights)
-            # block_hover_texts = construct_hover_text(block_weights, hovered_token)
-            # print("block hover texts = ", block_hover_texts)
-            for trace in block_fig['data']:
-                if trace['type'] == 'heatmap':
-                    trace['hovertext'][hovered_layer][hovered_index] += ' (Corresponding token)'
-
-        elif trigger_id == 'block-heatmap' and block_hoverData:
-            hovered_token = block_hoverData['points'][0]['text'].split('<br>')[0].split(': ')[1]
-            hovered_layer = int(block_hoverData['points'][0]['y'])
-            hovered_index = int(block_hoverData['points'][0]['x'])
-            print(hovered_token)
-            print(hovered_layer)
-            print(hovered_index)
-            # Update hovertext for the attention heatmap based on the hovered token
-            # att_weights = extractWeights(data, set_num * (num_layers_per_set + 1), num_layers_per_set,
-            #                              'Attention mechanism')
-            # print("att weights = ", att_weights)
-            # att_hover_texts = construct_hover_text(att_weights, hovered_token)
-            # print("att hover texts = ", att_hover_texts)
-            for trace in att_fig['data']:
-                if trace['type'] == 'heatmap':
-                    trace['hovertext'][hovered_layer][hovered_index] += ' (Corresponding token)'
-
-    except Exception as e:
-        print("Error during hover synchronization:", e)
-
-    return att_fig.to_dict(), block_fig.to_dict()
-
-
-def update_hover_info_for_other_graph(fig_dict, token):
-    # Check if data exists in the figure dictionary
-    if 'data' not in fig_dict:
-        print("No data key in figure dictionary.")
-        return
-
-    # Iterate over each trace in the figure data
-    for trace in fig_dict['data']:
-        # Check if the trace type is 'heatmap'
-        if 'type' in trace and trace['type'] == 'heatmap':
-            # Check if hovertext is present
-            if 'hovertext' not in trace or not isinstance(trace['hovertext'], list):
-                print("No hovertext found or hovertext is not a list.")
-                continue
-
-            # Update hovertext
-            new_hovertext = []
-            for row in trace['hovertext']:
-                new_row = []
-                if not isinstance(row, list):
-                    print("Row in hovertext is not a list.")
-                    continue
-                for cell_text in row:
-                    if f'Token: {token}' in cell_text:
-                        new_row.append(cell_text + ' (Corresponding token)')
-                    else:
-                        new_row.append(cell_text)
-                new_hovertext.append(new_row)
-            trace['hovertext'] = new_hovertext
-
-
-# Run the app
+# # Main execution
 if __name__ == '__main__':
-    app.run_server(debug=True)
-
+    my_dash_app = DashApp(sampleText)
+    my_dash_app.run()
