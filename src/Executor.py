@@ -3,7 +3,6 @@ from intermediate_transformer import clear_csv
 from confidence_visual import DashApp
 import multiprocessing
 import webbrowser
-import time
 import os
 import signal
 
@@ -51,11 +50,9 @@ class UserInterface:
             "1": self.tuned_lens,
             "2": self.other_probing,
             "3": self.visualization,
-            "sd": self.shutdown,
-            "q": self.quit,
-            "Q": self.quit
+            "sd": self.shutdown
         }
-        self.descriptions = ["1. Tuned-lens", "2. Other probing", "3. Visualization", "quit (Q or q)"]
+        self.descriptions = ["1. Logit-Lens", "2. Other probing", "3. Visualization", "quit (Q or q)"]
         self.dash_app_running = False
 
     def selectfile(self):
@@ -85,8 +82,8 @@ class UserInterface:
             print(f"| {formattedDescription} |")
         print(' ' + "-" * wave_length)
 
-    def tuned_lens(self):
-        print("Tuned-lens selected")
+    def logit_lens(self):
+        print("Logit-Lens selected")
         print("Please wait...")
         inputfile, outputfile = self.selectfile()
         clear_csv(outputfile)
@@ -134,10 +131,6 @@ class UserInterface:
             print("Dash app is not running.")
 
 
-    def quit(self):
-        print("Exit...")
-        exit()
-
     def userInput(self):
         while True:
             self.printCommands()
@@ -151,7 +144,8 @@ class UserInterface:
                 if self.dash_app_running:
                     print("Please shut down the server before quitting.")
                 else:
-                    print("Exiting...")
+                    print("Exit...")
+                    exit()
                     break
             else:
                 print("Unknown command. Please try again.")

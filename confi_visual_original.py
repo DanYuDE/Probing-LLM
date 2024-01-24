@@ -114,7 +114,7 @@ def plotGraph(tokenWeights, set_num, ax=None, text=None):
     # plt.show()
     return ax.figure
 
-file_path = '../output/new_output3.csv'
+file_path = 'output/new_output3.csv'
 data = pd.read_csv(file_path)
 
 num_layers_per_set = 32
