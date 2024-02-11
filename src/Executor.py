@@ -61,12 +61,18 @@ class UserInterface:
         defaultinput = '../files/outtest.txt'
         defaultoutput = '../output/t.csv'
         inputfile = input("Enter the input file name (including its path) or 0 for default (outtest.txt): ")
+        if inputfile.lower() == "q":
+            print("Return to main menu...")
+            return None
         if inputfile == "0":
             inputfile = defaultinput
-
-        outputFile = input("Enter the output file name (including its path) or 0 for default (t.csv): ")
-        if outputFile == "0":
-            outputFile = defaultoutput
+        else:
+            outputFile = input("Enter the output file name (including its path) or 0 for default (t.csv): ")
+            if outputFile.lower == "q":
+                print("Return to main menu...")
+                return None
+            if outputFile == "0":
+                outputFile = defaultoutput
         return inputfile, outputFile
 
     def printCommands(self):
@@ -87,7 +93,10 @@ class UserInterface:
     def logit_lens(self):
         print("Logit-Lens selected")
         print("Please wait...")
-        inputfile, outputfile = self.selectfile()
+        file_selection = self.selectfile()
+        if file_selection is None:  # Check if user chose to quit
+            return  # Return early to stop execution and go back to the main menu
+        inputfile, outputfile = file_selection
         clear_csv(outputfile)
         textList = self.readTextfile(inputfile)
         model = Llama7BHelper(self.token)
@@ -101,7 +110,10 @@ class UserInterface:
     def tuned_lens(self):
         print("Tuned-Lens selected")
         print("Please wait...")
-        inputfile, outputfile = self.selectfile()
+        file_selection = self.selectfile()
+        if file_selection is None:  # Check if user chose to quit
+            return  # Return early to stop execution and go back to the main menu
+        inputfile, outputfile = file_selection
         clear_csv(outputfile)
         textList = self.readTextfile(inputfile)
         model = Tuned_Llama7BHelper(self.token)
