@@ -6,8 +6,9 @@ import multiprocessing
 import webbrowser
 import os
 import signal
+import config
 
-token = "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"  # huggingface token
+token = config.token  # huggingface token
 
 #              1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12
 # output3      ., ., A, A, ., A, A, D, ., ., D, D
