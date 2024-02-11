@@ -1,5 +1,6 @@
 from intermediate_transformer import Llama7BHelper
-from intermediate_transformer import clear_csv
+from Tuned import Tuned_Llama7BHelper
+from utilities import clear_csv
 from confidence_visual import DashApp
 import multiprocessing
 import webbrowser
@@ -47,12 +48,13 @@ class UserInterface:
         self.token = token
         self.sampleText = sampleText
         self.commands = {
-            "1": self.tuned_lens,
-            "2": self.other_probing,
-            "3": self.visualization,
+            "1": self.logit_lens,
+            "2": self.tuned_lens,
+            "3": self.other_probing,
+            "4": self.visualization,
             "sd": self.shutdown
         }
-        self.descriptions = ["1. Logit-Lens", "2. Other probing", "3. Visualization", "quit (Q or q)"]
+        self.descriptions = ["1. Logit-Lens", "2. Tuned-Lens", "3. Other probing methods", "4. Visualization", "quit (Q or q)"]
         self.dash_app_running = False
 
     def selectfile(self):
@@ -92,11 +94,21 @@ class UserInterface:
         query = 1
         for t in textList:
             print(query)
-            model.decode_all_layers(text=self.sampleText.replace("{{inputText}}", t),
-                                    print_intermediate_res=True,
-                                    print_mlp=True,
-                                    print_block=True,
-                                    filename=outputfile)
+            model.decode_all_layers(text=self.sampleText.replace("{{inputText}}", t), filename=outputfile)
+            query += 1
+        model.reset_all()
+
+    def tuned_lens(self):
+        print("Tuned-Lens selected")
+        print("Please wait...")
+        inputfile, outputfile = self.selectfile()
+        clear_csv(outputfile)
+        textList = self.readTextfile(inputfile)
+        model = Tuned_Llama7BHelper(self.token)
+        query = 1
+        for t in textList:
+            print(query)
+            model.decode_all_layers(text=self.sampleText.replace("{{inputText}}", t), filename=outputfile)
             query += 1
         model.reset_all()
 

@@ -1,8 +1,10 @@
+# Normal Logit-Lens code
+
 import os
 # os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0" // for mps
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-import pandas as pd
+from utilities import write_to_csv
 
 class AttnWrapper(torch.nn.Module):
     def __init__(self, attn):
@@ -104,16 +106,19 @@ class Llama7BHelper:
     def print_decoded_activations(self, decoded_activations, label):
         softmaxed = torch.nn.functional.softmax(decoded_activations[0][-1], dim=-1)
         values, indices = torch.topk(softmaxed, 10)
+        print("values", values)
+        print(values.shape)
+        print("indices", indices)
+        print(indices.shape)
         probs_percent = [int(v * 100) for v in values.tolist()]
         tokens = self.tokenizer.batch_decode(indices.unsqueeze(-1))
-        # print(label, list(zip(tokens, probs_percent)))
 
         # Convert to list for CSV writing
         decoded_output = [label] + list(zip(tokens, probs_percent))
         return decoded_output
 
     def decode_all_layers(self, text, filename, print_attn_mech=True, print_intermediate_res=True, print_mlp=True,
-                          print_block=True, label=1):
+                          print_block=True):
         self.get_logits(text)
         dic = {}
         for i, layer in enumerate(self.model.model.layers):
@@ -126,9 +131,20 @@ class Llama7BHelper:
                     'MLP output': [],
                     'Block output': []
                 }
+
+            # print(f"{i} attn: ", layer.attn_mech_output_unembedded.shape)
+            # print(type(layer.attn_mech_output_unembedded))
+            # print(f"{i} intermediate: ", layer.intermediate_res_unembedded.shape)
+            # print(type(layer.intermediate_res_unembedded))
+            # print(f"{i} mlp: ", layer.mlp_output_unembedded.shape)
+            # print(type(layer.mlp_output_unembedded))
+            # print(f"{i} block: ", layer.block_output_unembedded.shape)
+            # print(type(layer.block_output_unembedded))
+
             if print_attn_mech:
                 decoded_output = self.print_decoded_activations(layer.attn_mech_output_unembedded,
                                                                 'Attention mechanism')
+                print(decoded_output[1:])
                 dic[f'layer{i}']['Attention mechanism'].extend(decoded_output[1:])
             if print_intermediate_res:
                 decoded_output = self.print_decoded_activations(layer.intermediate_res_unembedded,
@@ -142,24 +158,3 @@ class Llama7BHelper:
                 dic[f'layer{i}']['Block output'].extend(decoded_output[1:])
 
         write_to_csv(dic, filename)
-
-
-def clear_csv(filename):
-    open(filename, 'w').close()
-
-def write_to_csv(data, filename):
-    data_for_df = []
-    for layer, layer_data in data.items():
-        layer_dict = {
-            'Layer': layer,
-            'Attention mechanism': layer_data['Attention mechanism'],
-            'Intermediate residual stream': layer_data['Intermediate residual stream'],
-            'MLP output': layer_data['MLP output'],
-            'Block output': layer_data['Block output']
-        }
-
-        data_for_df.append(layer_dict)
-    df = pd.DataFrame(data_for_df)
-    print(df)
-    df.set_index('Layer', inplace=True)  # Set the 'Layer' column as the index
-    df.to_csv(filename, mode='a', index=True)
