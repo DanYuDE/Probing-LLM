@@ -41,7 +41,7 @@ class DashApp:
         self.data = pd.read_csv(self.file_path) if self.file_path else pd.DataFrame()
         self.num_layers_per_set = 32
         self.num_sets = len(self.data) // (self.num_layers_per_set + 1) if not self.data.empty else 0
-        self.sentences = self.read_sentences('../files/outtest.txt')
+        self.sentences = self.read_sentences('../files/question.txt')
         self.sampleText = sampleText
         self.setup_layout()
         self.setup_callbacks()

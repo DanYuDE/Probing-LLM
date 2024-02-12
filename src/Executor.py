@@ -59,7 +59,7 @@ class UserInterface:
         self.dash_app_running = False
 
     def selectfile(self):
-        defaultinput = '../files/outtest.txt'
+        defaultinput = '../files/question.txt'
         defaultoutput = '../output/t.csv'
         inputfile = input("Enter the input file name (including its path) or 0 for default (outtest.txt): ")
         if inputfile.lower() == "q":

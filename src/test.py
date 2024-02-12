@@ -144,7 +144,7 @@ helper = Tuned_Llama2_Helper('meta-llama/Llama-2-7b-chat-hf', token)
 
 # Prepare input text
 textList = []
-with open("../files/outtest.txt", 'r') as file:
+with open("../files/question.txt", 'r') as file:
     for text in file:
         textList.append(text.rstrip('\n'))
 
