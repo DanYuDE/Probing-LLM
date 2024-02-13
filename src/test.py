@@ -13,6 +13,7 @@ class Tuned_Llama2_Helper:
         print(self.model)
         print(self.tuned_lens)
         self.attention_outputs = [None] * len(self.model.model.layers)
+        self.intermediate_outputs = [None] * len(self.model.model.layers)
         self.mlp_outputs = [None] * len(self.model.model.layers)
         self.block_outputs = [None] * len(self.model.model.layers)
 
@@ -87,7 +88,7 @@ class Tuned_Llama2_Helper:
         tokens = self.tokenizer.convert_ids_to_tokens(top_indices.squeeze().tolist())
         probabilities = top_probs.squeeze().tolist()
         probs_percent = [round(v * 100, 2) for v in probabilities]
-        token_prob_pairs = [label] + list(zip(tokens, probs_percent))
+        token_prob_pairs = list(zip(tokens, probs_percent))
         return token_prob_pairs
 
     def __del__(self):

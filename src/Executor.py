@@ -44,6 +44,44 @@ Now you can start to answer the question with given options to give the correct 
 [INST] Input: {{inputText}}[/INST]
 Output: The correct answer is """
 
+test_text ="""<<SYS>>
+Role and goal:
+You are a manager of a production system. Your goal is to design an efficient production process based on a given task. You should take into account the provided context, instructions, and examples. Following these, you generate an output of a production process.
+
+Context:
+(1)	A production process consists of one or more process steps.
+(2)	There are two types of process steps, one type is transportation process step, another type is production process step.
+(3)	If the next production process is executed in a different production module, transportation process between two production processes is necessary.
+(4)	The transportation step can be executed with a transport robot.
+(5)	Transportation step is not considered as production process step.
+(6)	A production process always begins with a skill of the storage module and ends with a skill of the storage module.
+(7)	This production system that you manage consists of several production modules. Each of these production modules has one or more skills to execute a production process step.
+(8)	Each process step can be executed with one skill of a module.
+(9)	The production process should only contain the necessary steps that are necessary to satisfy a task specified in the input.
+The production modules are described as following:
+(10)	An inspection module. It has the following skills: (A) check the raw material, (B) check the faulty material, (C) test the quality of the material.
+(11)	A storage module. It has the following skills: (D) retrieve a workpiece, (E) store a workpiece.
+(12)	A transport robot. It has the following skills: (F) transport workpiece between different modules. (G) leave the production area.
+(13)	A CNC machine module. It has the following capabilities: (H) drilling, (I) milling, (J) polishing.
+(14)	A painting module. It has the following skills: (K) coat the material, (L) print a pattern on the surface with paint.
+(15)	A laser machine module. It has the following skills: (M) print a pattern on the surface with laser.
+Instructions:
+As a manager of this production system, please arrange a production process based on the input.
+Only use the skills that are given in the context section.
+Only use the skills that are necessary to carry out the task.
+Give an explanation with short reason in list form.
+You shall think step-by-step.
+Follow the text structure and syntax in the examples.
+Examples:
+Input:
+{produce a steel sheet with a hole}
+Output:
+{(D) – (F) – (A) – (F) – (H) – (F) – (C) – (F) – (E)}<</SYS>>
+[INST] Input:
+{the customer returned a wood nameplate and said there should be a painted customer logo on the backside. The wood nameplate is now in the storage module.}[/INST]
+Output:
+{("""
+
 class UserInterface:
     def __init__(self, token, sampleText):
         self.token = token
@@ -56,51 +94,62 @@ class UserInterface:
             "sd": self.shutdown
         }
         self.descriptions = ["1. Logit-Lens", "2. Tuned-Lens", "3. Other probing methods", "4. Visualization", "quit (Q or q)"]
+        self.model_choices = ["1. meta-llama/Llama-2-7b-hf", "2. meta-llama/Llama-2-7b-chat-hf", "quit(Q or q)"]
         self.dash_app_running = False
 
     def selectfile(self):
         defaultinput = '../files/question.txt'
         defaultoutput = '../output/t.csv'
-        inputfile = input("Enter the input file name (including its path) or 0 for default (outtest.txt): ")
+        inputfile = input(f"Enter the input file name (including its path) or 0 for default ({defaultinput}): ")
         if inputfile.lower() == "q":
             print("Return to main menu...")
             return None
         if inputfile == "0":
             inputfile = defaultinput
-        else:
-            outputFile = input("Enter the output file name (including its path) or 0 for default (t.csv): ")
-            if outputFile.lower == "q":
-                print("Return to main menu...")
-                return None
-            if outputFile == "0":
-                outputFile = defaultoutput
+        outputFile = input(
+            f"Enter the output file name (including its path) or 0 for default ({defaultoutput}): ")  # Moved this line out of the else block
+        if outputFile.lower() == "q":  # Corrected the method call from `outputFile.lower == "q"` to `outputFile.lower() == "q"`
+            print("Return to main menu...")
+            return None
+        if outputFile == "0":
+            outputFile = defaultoutput
         return inputfile, outputFile
 
-    def printCommands(self):
+    def printCommands(self, commands_list):
         longestDescriptionLength = 0
 
-        for description in self.descriptions:
+        for description in commands_list:
             longestDescriptionLength = max(longestDescriptionLength, len(description))
 
         wave_length = longestDescriptionLength + 2
 
         print(' ' + "-" * wave_length)
-        for description in self.descriptions:
+        for description in commands_list:
             # Adjust the description to have even spacing and a tab (4 spaces)
             formattedDescription = description.ljust(longestDescriptionLength)
             print(f"| {formattedDescription} |")
         print(' ' + "-" * wave_length)
 
-    def logit_lens(self):
+    def logit_lens(self, model_choice):
         print("Logit-Lens selected")
+        print("Selected Model:", model_choice)  # For demonstration
         print("Please wait...")
         file_selection = self.selectfile()
-        if file_selection is None:  # Check if user chose to quit
-            return  # Return early to stop execution and go back to the main menu
+        if file_selection is None:
+            return
         inputfile, outputfile = file_selection
         clear_csv(outputfile)
         textList = self.readTextfile(inputfile)
-        model = Llama7BHelper(self.token)
+
+        # Instantiate the model based on the model_choice
+        if model_choice == "1":
+            model = Llama7BHelper(self.token, "meta-llama/Llama-2-7b-hf")
+        elif model_choice == "2":
+            model = Llama7BHelper(self.token, "meta-llama/Llama-2-7b-chat-hf")
+        else:
+            print("Invalid model choice. Returning to main menu.")
+            return
+
         query = 1
         for t in textList:
             print(query)
@@ -155,16 +204,28 @@ class UserInterface:
         else:
             print("Dash app is not running.")
 
-
     def userInput(self):
         while True:
-            self.printCommands()
+            self.printCommands(self.descriptions)  # Initially print main commands
             userCommand = input("Enter command: ")
 
             if userCommand == 'sd':
                 self.shutdown()
-            elif userCommand in self.commands:
-                self.commands[userCommand]()
+            elif userCommand in ['1', '2']:  # For options requiring model choice
+                print("Select a model:")
+                self.printCommands(self.model_choices)
+                modelChoice = input("Enter model choice: ")
+                if modelChoice.lower() in ('q', 'Q'):
+                    print("Returning to main menu...")
+                    continue
+                # Convert model choice to the required format
+                if modelChoice == "1" or modelChoice == "2":
+                    if userCommand == '1':
+                        self.logit_lens(modelChoice)
+                    elif userCommand == '2':
+                        self.tuned_lens(modelChoice)
+                else:
+                    print("Invalid model choice. Please try again.")
             elif userCommand in ('q', 'Q'):
                 if self.dash_app_running:
                     print("Please shut down the server before quitting.")
@@ -172,6 +233,8 @@ class UserInterface:
                     print("Exit...")
                     exit()
                     break
+            elif userCommand in self.commands.keys() and userCommand not in ['1', '2']:
+                self.commands[userCommand]()  # Call other commands without model choice
             else:
                 print("Unknown command. Please try again.")
 

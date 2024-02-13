@@ -64,12 +64,12 @@ class BlockOutputWrapper(torch.nn.Module):
 
 
 class Llama7BHelper:
-    def __init__(self, token):
+    def __init__(self, token, model_name):
         # self.device = "cuda" if torch.cuda.is_available() else "cpu"
         # self.device = "mps" if torch.backends.mps.is_available() else "cpu"
         self.device = torch.device("cpu")
-        self.tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf", use_auth_token=token)
-        self.model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-chat-hf", use_auth_token=token).to(self.device)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_auth_token=token)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name, use_auth_token=token).to(self.device)
         for i, layer in enumerate(self.model.model.layers):
             self.model.model.layers[i] = BlockOutputWrapper(layer, self.model.lm_head, self.model.model.norm)
 
