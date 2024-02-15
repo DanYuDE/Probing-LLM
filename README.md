@@ -1,15 +1,17 @@
 # Interpretability Study of Large Language Models with Probing Techniques
 
-This research project explores the interpretability of large language models (Llama-2-7B) 
-through the implementation of two probing techniques -- Logit-Lens and Tuned-Lens. By dissecting 
-the internal workings of these models, I aim to shed light on how they understand and generate 
-language, offering insights into their decision-making processes.
+This research project explores the interpretability of large language models 
+(Llama-2-7B) through the implementation of two probing techniques -- Logit-Lens 
+and Tuned-Lens. By dissecting the internal workings of these models, the aim is 
+to shed light on how LLMs understand and generate language, offering insights 
+into their decision-making processes.
 
 ## Description
 
 The project delves into the Llama-2-7B model to understand the mechanics 
 behind its language understanding capabilities. Using probing techniques, 
-analyzing the models at different layers and stages of extracting interpretable features. 
+analyzing the models at different layers and stages of extracting 
+interpretable features. 
 
 ## Getting Started
 
@@ -53,6 +55,8 @@ Follow these steps to set up a local development environment:
     ```
     Update the `token` (Huggingface token) and `sampleText` (can add more LLM models in `model`).
 
+    **Note:** The sampleText has specific format with clear instruction. 
+
 6. Run the project:
     ```bash
     make
@@ -62,7 +66,11 @@ Follow these steps to set up a local development environment:
 
 ### Code Reference
 
-This project incorporates code and techniques inspired by the work of [nrimsky](https://github.com/nrimsky) as detailed in the [Intermediate Decoding Notebook](https://github.com/nrimsky/LM-exp/blob/main/intermediate_decoding/intermediate_decoding.ipynb). I extend my gratitude for the foundational methodologies and code examples provided, which have been pivotal in the development of probing techniques for LLM interpretability.
+This project incorporates code and techniques inspired by the work of 
+[nrimsky](https://github.com/nrimsky) as detailed in the [Intermediate Decoding Notebook](https://github.com/nrimsky/LM-exp/blob/main/intermediate_decoding/intermediate_decoding.ipynb). 
+I extend my gratitude for the foundational methodologies and code examples 
+provided, which have been pivotal in the development of probing techniques 
+for LLM interpretability.
 
 ### Special Thanks
 
