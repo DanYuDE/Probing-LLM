@@ -15,7 +15,7 @@ I analyze the models at different layers and stages of extracting interpretable 
 
 ### Dependencies
 
-- **Hardware:** M1 Macbook Pro
+- **Hardware:** M1 Macbook Pro (16GB RAM)
 - **OS:** MacOS 14.2.1 (Linux and Windows should work as well, but not tested yet)
 - **Python Version:** 3.10
 - **Framework:** Pytorch
