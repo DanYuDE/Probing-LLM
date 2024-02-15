@@ -7,9 +7,9 @@ language, offering insights into their decision-making processes.
 
 ## Description
 
-The project delves into the black box of Llama-2-7B model to understand the mechanics 
+The project delves into the Llama-2-7B model to understand the mechanics 
 behind its language understanding capabilities. Using probing techniques, 
-I analyze the models at different layers and stages of extracting interpretable features. 
+analyzing the models at different layers and stages of extracting interpretable features. 
 
 ## Getting Started
 
