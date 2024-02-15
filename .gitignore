@@ -165,3 +165,6 @@ config.py
 
 .idea
 .vscode
+
+attention_probing_tunedlens.py
+confi_visual_original.py
