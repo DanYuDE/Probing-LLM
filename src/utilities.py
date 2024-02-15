@@ -19,3 +19,11 @@ def write_to_csv(data, filename):
     print(df)
     df.set_index('Layer', inplace=True)  # Set the 'Layer' column as the index
     df.to_csv(filename, mode='a', index=True)
+
+
+def readTextfile(inputfile):
+    textList = []
+    with open(inputfile, 'r') as file:
+        for text in file:
+            textList.append(text.rstrip('\n'))
+    return textList

@@ -2,97 +2,148 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from tuned_lens.nn.lenses import TunedLens
 import pandas as pd
+import config
+from tqdm import tqdm
 # from utilities import write_to_csv
 
+class AttnWrapper(torch.nn.Module):
+    def __init__(self, attn):
+        super().__init__()
+        self.attn = attn
+        self.activations = None
+        self.add_tensor = None
+
+    def forward(self, *args, **kwargs):
+        # print("Forward method called in AttnWrapper")
+        output = self.attn(*args, **kwargs)
+        if self.add_tensor is not None:
+            output = (output[0] + self.add_tensor,) + output[1:]
+        self.activations = output[0]
+        # print("Activations shape:", self.activations.shape)
+        return output
+
+    def reset(self):
+        self.activations = None
+        self.add_tensor = None
+
+
+class BlockOutputWrapper(torch.nn.Module):
+    def __init__(self, block, unembed_matrix, norm):
+        super().__init__()
+        self.block = block
+        self.unembed_matrix = unembed_matrix
+        self.norm = norm
+
+        self.block.self_attn = AttnWrapper(self.block.self_attn)
+        self.post_attention_layernorm = self.block.post_attention_layernorm
+
+        self.attn_mech_output = None
+        self.intermediate_res = None
+        self.mlp_output = None
+        self.block_output = None
+
+    def forward(self, *args, **kwargs):
+        output = self.block(*args, **kwargs)
+        # Skip the unembedding and norm steps as they will be handled by TunedLens
+        self.attn_mech_output = self.block.self_attn.activations
+        attn_output = self.attn_mech_output
+        self.intermediate_res = attn_output + args[0]
+        mlp_output = self.block.mlp(self.post_attention_layernorm(self.intermediate_res))
+        self.mlp_output = mlp_output
+        self.block_output = self.mlp_output + self.intermediate_res
+        return output
+
+    def attn_add_tensor(self, tensor):
+        self.block.self_attn.add_tensor = tensor
+
+    def reset(self):
+        self.block.self_attn.reset()
+
+    def get_attn_activations(self):
+        return self.block.self_attn.activations
 
 class Tuned_Llama2_Helper:
     def __init__(self, model_name_or_path, auth_token):
+        self.device = torch.device('cpu')
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_auth_token=auth_token)
         self.model = AutoModelForCausalLM.from_pretrained(model_name_or_path, use_auth_token=auth_token)
-        self.tuned_lens = TunedLens.from_model_and_pretrained(self.model, map_location=torch.device('cpu'))
-        print(self.model)
-        print(self.tuned_lens)
-        self.attention_outputs = [None] * len(self.model.model.layers)
-        self.intermediate_outputs = [None] * len(self.model.model.layers)
-        self.mlp_outputs = [None] * len(self.model.model.layers)
-        self.block_outputs = [None] * len(self.model.model.layers)
+        self.tuned_lens = TunedLens.from_model_and_pretrained(self.model, map_location=self.device)
+        self.bar = tqdm(total=100)
+        # print(self.model)
+        # print(self.tuned_lens)
 
-        self.hooks = []
         for i, layer in enumerate(self.model.model.layers):
-            self.hooks.append(layer.self_attn.register_forward_hook(self.capture_attention_output(i)))
-            self.hooks.append(layer.mlp.register_forward_hook(self.capture_mlp_output(i)))
-            # Block output capturing depends on your definition, here we use the same as MLP for demonstration
-            self.hooks.append(layer.mlp.register_forward_hook(self.capture_block_output(i)))
+            # Initialize the unembed_matrix and norm for each BlockOutputWrapper
+            unembed_matrix = self.tuned_lens.layer_translators[i]
+            norm = self.model.model.norm
+            # Wrap the original layer with BlockOutputWrapper
+            self.model.model.layers[i] = BlockOutputWrapper(layer, unembed_matrix, norm)
+            # print(f"Layer {i} wrapped: {self.model.model.layers[i]}")
 
-    def capture_attention_output(self, layer_idx):
-        def hook(module, input, output):
-            self.attention_outputs[layer_idx] = self.tuned_lens.transform_hidden(output[0], layer_idx)
-
-        return hook
-
-    def capture_mlp_output(self, layer_idx):
-        def hook(module, input, output):
-            self.mlp_outputs[layer_idx] = self.tuned_lens.transform_hidden(output, layer_idx)
-
-        return hook
-
-    def capture_block_output(self, layer_idx):
-        def hook(module, input, output):
-            self.block_outputs[layer_idx] = output
-
-        return hook
-
-    def clear_captures(self):
-        self.attention_outputs = [None] * len(self.model.model.layers)
-        self.mlp_outputs = [None] * len(self.model.model.layers)
-        self.block_outputs = [None] * len(self.model.model.layers)
-
-    def remove_hooks(self):
-        for hook in self.hooks:
-            hook.remove()
-        self.hooks = []
-
-    def forward_with_lens(self, input_ids):
-        # Ensure the model is in evaluation mode and no gradients are computed
-        self.model.eval()
+    def get_logits(self, prompt):
+        inputs = self.tokenizer(prompt, return_tensors="pt")
         with torch.no_grad():
-            # Pass input through the model. Since hooks are already registered,
-            # they will store the required outputs in the respective lists.
-            _ = self.model(input_ids=input_ids)
-        data = []
-        for i, layer in enumerate(self.model.model.layers):
-            self.model.eval()
-            with torch.no_grad():
-                _ = self.model(input_ids=input_ids)
+            logits = self.model(inputs.input_ids.to(self.device)).logits
+            return logits
 
+    def forward_with_lens(self, prompt):
+        # Ensure the model is in evaluation mode and no gradients are computed
+        self.get_logits(prompt)
+        self.model.eval()
+        # with torch.no_grad():
+        #     # Pass input through the model
+        #     _ = self.model(input_ids=input_ids)
 
-            data.append({
-                "Layer": i,
-                "Attention": self.decode_and_print_top_tokens(self.attention_outputs[0], f"Attention", i),
-                "MLP": self.decode_and_print_top_tokens(self.mlp_outputs[0], f"MLP", i),
-                "Block": self.decode_and_print_top_tokens(self.block_outputs[0], f"Block", i),
-            })
-            df = pd.DataFrame(data)
-            df.to_csv("layer_outputs.csv", index=False)
-            self.clear_captures()
+        # data = []
+        dic = {}
+        for i, layer_wrapper in tqdm(enumerate(self.model.model.layers), desc="Processing layers", total=len(self.model.model.layers)):
+            assert layer_wrapper.attn_mech_output is not None, "Attention mechanism output is None"
+            attn_mech_output = layer_wrapper.attn_mech_output
+            intermediate_res = layer_wrapper.intermediate_res
+            mlp_output = layer_wrapper.mlp_output
+            block_output = layer_wrapper.block_output
 
-    def decode_and_print_top_tokens(self, hidden_states, label, layer_idx):
+            layer_key = f'layer{i}'
+            if layer_key not in dic:
+                dic[layer_key] = {
+                    'Attention mechanism': [],
+                    'Intermediate residual stream': [],
+                    'MLP output': [],
+                    'Block output': []
+                }
+
+            dic[layer_key]['Attention mechanism'].append(self.decode_and_print_top_tokens(attn_mech_output, i))
+            dic[layer_key]['Intermediate residual stream'].append(self.decode_and_print_top_tokens(intermediate_res, i))
+            dic[layer_key]['MLP output'].append(self.decode_and_print_top_tokens(mlp_output, i))
+            dic[layer_key]['Block output'].append(self.decode_and_print_top_tokens(block_output, i))
+
+            # Decode and print top tokens
+            # data.append({
+            #     "Layer": f'layer{i}',
+            #     "Attention": self.decode_and_print_top_tokens(attn_mech_output, i),
+            #     "Intermediate": self.decode_and_print_top_tokens(intermediate_res, i),
+            #     "MLP": self.decode_and_print_top_tokens(mlp_output, i),
+            #     "Block": self.decode_and_print_top_tokens(block_output, i),
+            # })
+        # df = pd.DataFrame(data)
+        # print(df)
+        # df.to_csv("layer_outputs.csv", index=False)
+        write_to_csv(dic, "layer_outputs.csv")
+
+    def decode_and_print_top_tokens(self, hidden_states, layer_idx):
         logits = self.tuned_lens(hidden_states, layer_idx)
-        print(logits)
+        # print(logits)
         probs = torch.nn.functional.softmax(logits[0][-1], dim=-1)
         top_probs, top_indices = torch.topk(probs, 10, dim=-1)
-        print("top_indices", top_indices)
-        print(top_indices.shape)
-        print("top_probs", top_probs)
-        print(top_probs.shape)
+        # print("top_indices", top_indices)
+        # print(top_indices.shape)
+        # print("top_probs", top_probs)
+        # print(top_probs.shape)
         tokens = self.tokenizer.convert_ids_to_tokens(top_indices.squeeze().tolist())
         probabilities = top_probs.squeeze().tolist()
         probs_percent = [round(v * 100, 2) for v in probabilities]
         token_prob_pairs = list(zip(tokens, probs_percent))
         return token_prob_pairs
-
-    def __del__(self):
-        self.remove_hooks()
 
 
 def write_to_csv(data, filename):
@@ -100,10 +151,10 @@ def write_to_csv(data, filename):
     for layer, layer_data in data.items():
         layer_dict = {
             'Layer': layer,
-            'attention': layer_data['attention'],
-            # 'Intermediate residual stream': layer_data['Intermediate residual stream'],
-            'MLP': layer_data['MLP'],
-            'Block': layer_data['Block']
+            'Attention mechanism': layer_data['Attention mechanism'],
+            'Intermediate residual stream': layer_data['Intermediate residual stream'],
+            'MLP output': layer_data['MLP output'],
+            'Block output': layer_data['Block output']
         }
 
         data_for_df.append(layer_dict)
@@ -139,7 +190,7 @@ Now you can start to answer the question with given options to give the correct 
 [INST] Input: {{inputText}}[/INST]
 Output: The correct answer is """
 
-token = "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"
+token = config.token
 # Replace 'your_model_name_or_path' with the path to your Llama2 model
 helper = Tuned_Llama2_Helper('meta-llama/Llama-2-7b-chat-hf', token)
 
@@ -149,15 +200,19 @@ with open("../files/question.txt", 'r') as file:
     for text in file:
         textList.append(text.rstrip('\n'))
 
-input_text = sampleText.replace("{{inputText}}", textList[0])
-input_ids = helper.tokenizer.encode(input_text, return_tensors='pt')
+query = 1
+for text in textList:
+    print("query", query)
+    # input_text = sampleText.replace("{{inputText}}", text)
+    # input_ids = helper.tokenizer.encode(input_text, return_tensors='pt')
 
-# Get the decoded outputs
-decoded_layers = helper.forward_with_lens(input_ids)
+    # Get the decoded outputs
+    helper.forward_with_lens(sampleText.replace("{{inputText}}", text))
+    query += 1
 
-# Interpret the decoded outputs
-for layer_idx, layer in decoded_layers.items():
-    print(f"Layer {layer_idx}:")
-    print(f"Attention: {layer['attention']}")
-    print(f"MLP: {layer['mlp']}")
-    print(f"Block: {layer['block']}")
+# # Interpret the decoded outputs
+# for layer_idx, layer in decoded_layers.items():
+#     print(f"Layer {layer_idx}:")
+#     print(f"Attention: {layer['attention']}")
+#     print(f"MLP: {layer['mlp']}")
+#     print(f"Block: {layer['block']}")

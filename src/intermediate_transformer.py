@@ -75,11 +75,11 @@ class Llama7BHelper:
 
         self.first_write = True
 
-    def generate_text(self, prompt, max_length=100): #, temperature=1):
-        inputs = self.tokenizer(prompt, return_tensors="pt")
-        print("Tokens:", self.tokenizer.convert_ids_to_tokens(inputs.input_ids[0]))
-        generate_ids = self.model.generate(inputs.input_ids.to(self.device), max_length=max_length) #, temperature=temperature)
-        return self.tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+    # def generate_text(self, prompt, max_length=100): #, temperature=1):
+    #     inputs = self.tokenizer(prompt, return_tensors="pt")
+    #     print("Tokens:", self.tokenizer.convert_ids_to_tokens(inputs.input_ids[0]))
+    #     generate_ids = self.model.generate(inputs.input_ids.to(self.device), max_length=max_length) #, temperature=temperature)
+    #     return self.tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 
     def get_logits(self, prompt):
         inputs = self.tokenizer(prompt, return_tensors="pt")
@@ -117,9 +117,9 @@ class Llama7BHelper:
         decoded_output = [label] + list(zip(tokens, probs_percent))
         return decoded_output
 
-    def decode_all_layers(self, text, filename, print_attn_mech=True, print_intermediate_res=True, print_mlp=True,
+    def decode_all_layers(self, prompt, filename, print_attn_mech=True, print_intermediate_res=True, print_mlp=True,
                           print_block=True):
-        self.get_logits(text)
+        self.get_logits(prompt)
         dic = {}
         for i, layer in enumerate(self.model.model.layers):
             # print(f'Layer {i}: Decoded intermediate outputs')
@@ -131,15 +131,6 @@ class Llama7BHelper:
                     'MLP output': [],
                     'Block output': []
                 }
-
-            # print(f"{i} attn: ", layer.attn_mech_output_unembedded.shape)
-            # print(type(layer.attn_mech_output_unembedded))
-            # print(f"{i} intermediate: ", layer.intermediate_res_unembedded.shape)
-            # print(type(layer.intermediate_res_unembedded))
-            # print(f"{i} mlp: ", layer.mlp_output_unembedded.shape)
-            # print(type(layer.mlp_output_unembedded))
-            # print(f"{i} block: ", layer.block_output_unembedded.shape)
-            # print(type(layer.block_output_unembedded))
 
             if print_attn_mech:
                 decoded_output = self.print_decoded_activations(layer.attn_mech_output_unembedded,
