@@ -1,42 +1,15 @@
 # Normal Logit-Lens code
-
 import os
 # os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0" // for mps
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from utilities import write_to_csv
+from ModelWrapperBase import BlockOutputWrapper
+from tqdm import tqdm
 
-class AttnWrapper(torch.nn.Module):
-    def __init__(self, attn):
-        super().__init__()
-        self.attn = attn
-        self.activations = None
-        self.add_tensor = None
-
-    def forward(self, *args, **kwargs):
-        # print("Forward method called in AttnWrapper")
-        output = self.attn(*args, **kwargs)
-        if self.add_tensor is not None:
-            output = (output[0] + self.add_tensor,) + output[1:]
-        self.activations = output[0]
-        # print("Activations shape:", self.activations.shape)
-        return output
-
-    def reset(self):
-        self.activations = None
-        self.add_tensor = None
-
-
-class BlockOutputWrapper(torch.nn.Module):
+class LogitBlockOutputWrapper(BlockOutputWrapper):
     def __init__(self, block, unembed_matrix, norm):
-        super().__init__()
-        self.block = block
-        self.unembed_matrix = unembed_matrix
-        self.norm = norm
-
-        self.block.self_attn = AttnWrapper(self.block.self_attn)
-        self.post_attention_layernorm = self.block.post_attention_layernorm
-
+        super().__init__(block, unembed_matrix, norm)
         self.attn_mech_output_unembedded = None
         self.intermediate_res_unembedded = None
         self.mlp_output_unembedded = None
@@ -53,15 +26,6 @@ class BlockOutputWrapper(torch.nn.Module):
         self.mlp_output_unembedded = self.unembed_matrix(self.norm(mlp_output))
         return output
 
-    def attn_add_tensor(self, tensor):
-        self.block.self_attn.add_tensor = tensor
-
-    def reset(self):
-        self.block.self_attn.reset()
-
-    def get_attn_activations(self):
-        return self.block.self_attn.activations
-
 
 class Llama7BHelper:
     def __init__(self, token, model_name):
@@ -70,16 +34,10 @@ class Llama7BHelper:
         self.device = torch.device("cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_auth_token=token)
         self.model = AutoModelForCausalLM.from_pretrained(model_name, use_auth_token=token).to(self.device)
-        for i, layer in enumerate(self.model.model.layers):
-            self.model.model.layers[i] = BlockOutputWrapper(layer, self.model.lm_head, self.model.model.norm)
+        for i, layer in tqdm(enumerate(self.model.model.layers), desc="Wrapping layers", total=len(self.model.model.layers)):
+            self.model.model.layers[i] = LogitBlockOutputWrapper(layer, self.model.lm_head, self.model.model.norm)
 
         self.first_write = True
-
-    # def generate_text(self, prompt, max_length=100): #, temperature=1):
-    #     inputs = self.tokenizer(prompt, return_tensors="pt")
-    #     print("Tokens:", self.tokenizer.convert_ids_to_tokens(inputs.input_ids[0]))
-    #     generate_ids = self.model.generate(inputs.input_ids.to(self.device), max_length=max_length) #, temperature=temperature)
-    #     return self.tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 
     def get_logits(self, prompt):
         inputs = self.tokenizer(prompt, return_tensors="pt")
@@ -93,11 +51,6 @@ class Llama7BHelper:
     def get_attn_activations(self, layer):
         layer_output = self.model.model.layers[layer].get_attn_activations()
         return layer_output
-        # if layer_output is not None:
-        #     attentions = layer_output.view(1, 60, 64, 64)
-        #     return attentions
-        # else:
-        #     raise ValueError(f"Attention output for layer {layer} is None or invalid.")
 
     def reset_all(self):
         for layer in self.model.model.layers:
@@ -121,7 +74,7 @@ class Llama7BHelper:
                           print_block=True):
         self.get_logits(prompt)
         dic = {}
-        for i, layer in enumerate(self.model.model.layers):
+        for i, layer in tqdm(enumerate(self.model.model.layers), desc="Processing layers", total=len(self.model.model.layers), leave=False):
             # print(f'Layer {i}: Decoded intermediate outputs')
             layer_key = f'layer{i}'
             if layer_key not in dic:

@@ -7,6 +7,7 @@ import webbrowser
 import os
 import signal
 import config
+import time
 
 #              1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12
 # output3      ., ., A, A, ., A, A, D, ., ., D, D
@@ -93,7 +94,10 @@ class UserInterface:
 
         for i, text in enumerate(textList):
             print(f"Prompt {i + 1}:")
+            startTime = time.time()
             model.decode_all_layers(prompt=self.sampleText.replace("{{inputText}}", text), filename=outputfile)
+            endTime = time.time() - startTime
+            print(f"Time taken: {endTime} seconds")
         model.reset_all()
 
     def tuned_lens(self, model_choice):
@@ -117,7 +121,10 @@ class UserInterface:
 
         for i, text in enumerate(textList):
             print(f"Prompt {i + 1}:")
+            startTime = time.time()
             model.forward_with_lens(prompt=self.sampleText.replace("{{inputText}}", text), filename=outputfile)
+            endTime = time.time() - startTime
+            print(f"Time taken: {endTime} seconds")
         model.reset_all()
 
     def other_probing(self):

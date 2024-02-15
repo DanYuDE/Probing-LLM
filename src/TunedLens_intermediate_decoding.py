@@ -5,37 +5,11 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from utilities import write_to_csv
 from tuned_lens.nn.lenses import TunedLens
 from tqdm import tqdm
+from ModelWrapperBase import BlockOutputWrapper
 
-class AttnWrapper(torch.nn.Module):
-    def __init__(self, attn):
-        super().__init__()
-        self.attn = attn
-        self.activations = None
-        self.add_tensor = None
-
-    def forward(self, *args, **kwargs):
-        # print("Forward method called in AttnWrapper")
-        output = self.attn(*args, **kwargs)
-        if self.add_tensor is not None:
-            output = (output[0] + self.add_tensor,) + output[1:]
-        self.activations = output[0]
-        # print("Activations shape:", self.activations.shape)
-        return output
-
-    def reset(self):
-        self.activations = None
-        self.add_tensor = None
-
-class BlockOutputWrapper(torch.nn.Module):
+class TunedLensBlockOutputWrapper(BlockOutputWrapper):
     def __init__(self, block, unembed_matrix, norm):
-        super().__init__()
-        self.block = block
-        self.unembed_matrix = unembed_matrix
-        self.norm = norm
-
-        self.block.self_attn = AttnWrapper(self.block.self_attn)
-        self.post_attention_layernorm = self.block.post_attention_layernorm
-
+        super().__init__(block, unembed_matrix, norm)
         self.attn_mech_output = None
         self.intermediate_res = None
         self.mlp_output = None
@@ -52,15 +26,6 @@ class BlockOutputWrapper(torch.nn.Module):
         self.block_output = self.mlp_output + self.intermediate_res
         return output
 
-    def attn_add_tensor(self, tensor):
-        self.block.self_attn.add_tensor = tensor
-
-    def reset(self):
-        self.block.self_attn.reset()
-
-    def get_attn_activations(self):
-        return self.block.self_attn.activations
-
 class Tuned_Llama2_Helper:
     def __init__(self, auth_token, model_name_or_path):
         self.device = torch.device('cpu')
@@ -76,7 +41,7 @@ class Tuned_Llama2_Helper:
             unembed_matrix = self.tuned_lens.layer_translators[i]
             norm = self.model.model.norm
             # Wrap the original layer with BlockOutputWrapper
-            self.model.model.layers[i] = BlockOutputWrapper(layer, unembed_matrix, norm)
+            self.model.model.layers[i] = TunedLensBlockOutputWrapper(layer, unembed_matrix, norm)
             # print(f"Layer {i} wrapped: {self.model.model.layers[i]}")
 
     def get_logits(self, prompt):
@@ -90,11 +55,7 @@ class Tuned_Llama2_Helper:
         # Ensure the model is in evaluation mode and no gradients are computed
         self.get_logits(prompt)
         self.model.eval()
-        # with torch.no_grad():
-        #     # Pass input through the model
-        #     _ = self.model(input_ids=input_ids)
 
-        # data = []
         dic = {}
         for i, layer_wrapper in tqdm(enumerate(self.model.model.layers), desc="Processing layers", total=len(self.model.model.layers), leave=False):
             assert layer_wrapper.attn_mech_output is not None, "Attention mechanism output is None"
