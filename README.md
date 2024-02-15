@@ -62,7 +62,7 @@ Follow these steps to set up a local development environment:
 
 ### Code Reference
 
-This project incorporates code and techniques inspired by the work of [nrimsky](https://github.com/nrimsky) as detailed in the [Intermediate Decoding Notebook](https://github.com/nrimsky/LM-exp/blob/main/intermediate_decoding/intermediate_decoding.ipynb). I extend my gratitude for the foundational methodologies and code examples provided, which have been pivotal in the development of our probing techniques for LLM interpretability.
+This project incorporates code and techniques inspired by the work of [nrimsky](https://github.com/nrimsky) as detailed in the [Intermediate Decoding Notebook](https://github.com/nrimsky/LM-exp/blob/main/intermediate_decoding/intermediate_decoding.ipynb). I extend my gratitude for the foundational methodologies and code examples provided, which have been pivotal in the development of probing techniques for LLM interpretability.
 
 ### Special Thanks
 
