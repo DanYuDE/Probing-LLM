@@ -33,11 +33,27 @@ Follow these steps to set up a local development environment:
     ```bash
     cd Research-Project
     ```
-3. Install the required packages:
+3. Create a virtual environment:
+    ```bash
+    python -m venv venv
+    source venv/bin/activate
+    ```
+   or Using Anaconda:
+   ```bash
+    conda create -n your_env_name python=3.10
+    conda activate your_env_name
+    ```
+4. Install the required packages:
     ```bash
     pip install -r requirements.txt
     ```
-4. Run the project:
+5. Add new `config.py` file, the `config_example.py` file is provided as a template:
+    ```bash
+    nano config.py
+    ```
+    Update the `token` (Huggingface token) and `sampleText` (can add more LLM models in `model`).
+
+6. Run the project:
     ```bash
     make
     ```
