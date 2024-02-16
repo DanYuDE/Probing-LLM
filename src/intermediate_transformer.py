@@ -59,10 +59,10 @@ class Llama7BHelper:
     def print_decoded_activations(self, decoded_activations, label):
         softmaxed = torch.nn.functional.softmax(decoded_activations[0][-1], dim=-1)
         values, indices = torch.topk(softmaxed, 10)
-        print("values", values)
-        print(values.shape)
-        print("indices", indices)
-        print(indices.shape)
+        # print("values", values)
+        # print(values.shape)
+        # print("indices", indices)
+        # print(indices.shape)
         probs_percent = [int(v * 100) for v in values.tolist()]
         tokens = self.tokenizer.batch_decode(indices.unsqueeze(-1))
 
@@ -88,7 +88,7 @@ class Llama7BHelper:
             if print_attn_mech:
                 decoded_output = self.print_decoded_activations(layer.attn_mech_output_unembedded,
                                                                 'Attention mechanism')
-                print(decoded_output[1:])
+                # print(decoded_output[1:])
                 dic[f'layer{i}']['Attention mechanism'].extend(decoded_output[1:])
             if print_intermediate_res:
                 decoded_output = self.print_decoded_activations(layer.intermediate_res_unembedded,

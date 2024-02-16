@@ -17,10 +17,11 @@ import time
 # answer       D, B, D, B, B, D, D, B, C, B, A, C
 
 class UserInterface:
-    def __init__(self, token, llama_model, sampleText):
+    def __init__(self, token, llama_model):
         self.token = token
         self.llama_model = llama_model
-        self.sampleText = sampleText
+        self.selectedText = None
+        self.texts = {"1": config.sampleText, "2": config.testText}
         self.commands = {
             "1": self.logit_lens,
             "2": self.tuned_lens,
@@ -32,28 +33,32 @@ class UserInterface:
         self.model_choices = ["1. meta-llama/Llama-2-7b-hf", "2. meta-llama/Llama-2-7b-chat-hf", "quit(Q or q)"]
         self.dash_app_running = False
 
-    def selectfile(self, operation, model_choice):
+    def select_text(self):
+        text_choice = input("Choose the selectedText to use - '1' for sampleText, '2' for testText: ").strip()
+        return self.texts.get(text_choice, config.sampleText), "sampleText" if text_choice == '1' else "testText"  # Defaults to sampleText if choice is invalid
+
+    def selectfile(self, operation, model_choice, textPar):
         defaultinput = '../files/question.txt'
-        # Construct default output file name based on operation and model choice
         model_map = {"1": 'llama-2-7b-hf', "2": 'llama-2-7b-chat-hf'}
         operation_map = {"1": "LogitLens", "2": "TunedLens"}
         modelName = model_map.get(model_choice, "unknown_model")
         operationName = operation_map.get(operation, "unknown_operation")
-        defaultoutput = f"../output/{modelName}_{operationName}_res.csv"
+        defaultoutput = f"../output/{modelName}_{operationName}_{textPar}_res.csv"
 
-        inputfile = input(f"Enter the input file name (including its path) or 0 for default ({defaultinput}): ")
-        if inputfile.lower() == "q":
+        inputfile = None
+        if textPar == "testText":
+            inputfile = input(f"Enter the input file name (including its path),"
+                              f" or 0 for default ({defaultinput}) or 'q' to return to main menu: ").lower()
+            if inputfile == "q":
+                print("Return to main menu...")
+                return None
+            inputfile = defaultinput if inputfile == "0" else inputfile
+
+        outputFile = input(f"Enter the output file name (including its path) or 0 for default ({defaultoutput}): ").lower()
+        if outputFile == "q":
             print("Return to main menu...")
             return None
-        if inputfile == "0":
-            inputfile = defaultinput
-
-        outputFile = input(f"Enter the output file name (including its path) or 0 for default ({defaultoutput}): ")
-        if outputFile.lower() == "q":
-            print("Return to main menu...")
-            return None
-        if outputFile == "0":
-            outputFile = defaultoutput
+        outputFile = defaultoutput if outputFile == "0" else outputFile
 
         return inputfile, outputFile
 
@@ -76,55 +81,54 @@ class UserInterface:
         print("Logit-Lens selected")
         print("Selected Model:", model_choice)
         print("Please wait...")
-        file_selection = self.selectfile("1", model_choice)
-        if file_selection is None:
-            return
-        inputfile, outputfile = file_selection
-        clear_csv(outputfile)
-        textList = readTextfile(inputfile)
 
-        # Instantiate the model based on the model_choice
-        if model_choice == "1":
-            model = Llama7BHelper(self.token, self.llama_model[0])  # Llama-2-7b-hf
-        elif model_choice == "2":
-            model = Llama7BHelper(self.token, self.llama_model[1])  # Llama-2-7b-chat-hf
-        else:
+        self.selectedText, textPar = self.select_text()
+        inputfile, outputfile = self.selectfile("1", model_choice, textPar)
+        clear_csv(outputfile)
+
+        model = Llama7BHelper(self.token, self.llama_model[int(model_choice) - 1]) if model_choice in ["1", "2"] else None
+        if model is None:
             print("Invalid model choice. Returning to main menu.")
             return
 
+        textList = [self.selectedText] if inputfile is None else readTextfile(inputfile)
+
         for i, text in enumerate(textList):
-            print(f"Prompt {i + 1}:")
+            prompt = text if inputfile is None else self.selectedText.replace("{{inputText}}", text)
+            print(f"Probing selectedText {i + 1}:" if inputfile else "Probing sample text:")
             startTime = time.time()
-            model.decode_all_layers(prompt=self.sampleText.replace("{{inputText}}", text), filename=outputfile)
+            model.decode_all_layers(prompt=prompt, filename=outputfile)
             endTime = time.time() - startTime
             print(f"Time taken: {endTime} seconds")
+
         model.reset_all()
 
     def tuned_lens(self, model_choice):
         print("Tuned-Lens selected")
         print("Selected Model:", model_choice)
         print("Please wait...")
-        file_selection = self.selectfile("2", model_choice)
-        if file_selection is None:  # Check if user chose to quit
-            return  # Return early to stop execution and go back to the main menu
-        inputfile, outputfile = file_selection
+
+        self.selectedText, textPar = self.select_text()
+        inputfile, outputfile = self.selectfile("2", model_choice, textPar)
         clear_csv(outputfile)
-        textList = readTextfile(inputfile)
-        # Instantiate the model based on the model_choice
-        if model_choice == "1":
-            model = Tuned_Llama2_Helper(self.token, self.llama_model[0])
-        elif model_choice == "2":
-            model = Tuned_Llama2_Helper(self.token, self.llama_model[1])
-        else:
+
+        # Determine model based on choice
+        model = Tuned_Llama2_Helper(self.token, self.llama_model[int(model_choice) - 1]) if model_choice in ["1", "2"] else None
+        if model is None:
             print("Invalid model choice. Returning to main menu.")
             return
 
+        # Prepare the selectedText list based on inputfile presence
+        textList = [self.selectedText] if inputfile is None else readTextfile(inputfile)
+
         for i, text in enumerate(textList):
-            print(f"Prompt {i + 1}:")
+            prompt = text if inputfile is None else self.selectedText.replace("{{inputText}}", text)
+            print(f"Probing selectedText {i + 1}:" if inputfile else "Probing sample text:")
             startTime = time.time()
-            model.forward_with_lens(prompt=self.sampleText.replace("{{inputText}}", text), filename=outputfile)
+            model.forward_with_lens(prompt=prompt, filename=outputfile)
             endTime = time.time() - startTime
             print(f"Time taken: {endTime} seconds")
+
         model.reset_all()
 
     def other_probing(self):
@@ -143,7 +147,7 @@ class UserInterface:
         print("Enter 'sd' to shutdown the server.")
 
     def run_dash_app(self):
-        app = DashApp(self.sampleText)
+        app = DashApp(config.testText)
         app.run(debug=False)
 
     def shutdown(self):
@@ -164,28 +168,25 @@ class UserInterface:
 
             if userCommand == 'sd':
                 self.shutdown()
+
             elif userCommand in ['1', '2']:  # For options requiring model choice
                 print("Select a model:")
                 self.printCommands(self.model_choices)
-                modelChoice = input("Enter model choice: ")
-                if modelChoice.lower() in ('q', 'Q'):
+                modelChoice = input("Enter model choice: ").lower()
+                if modelChoice == 'q':
                     print("Returning to main menu...")
                     continue
-                # Convert model choice to the required format
-                if modelChoice == "1" or modelChoice == "2":
-                    if userCommand == '1':
-                        self.logit_lens(modelChoice)
-                    elif userCommand == '2':
-                        self.tuned_lens(modelChoice)
+
+                if modelChoice in ["1", "2"]:
+                    self.logit_lens(modelChoice) if userCommand == '1' else self.tuned_lens(modelChoice)
                 else:
                     print("Invalid model choice. Please try again.")
+
             elif userCommand in ('q', 'Q'):
-                if self.dash_app_running:
-                    print("Please shut down the server before quitting.")
-                else:
-                    print("Exit...")
-                    exit()
+                print("Exit..." if not self.dash_app_running else "Please shut down the server before quitting.")
+                if not self.dash_app_running:
                     break
+
             elif userCommand in self.commands.keys() and userCommand not in ['1', '2']:
                 self.commands[userCommand]()  # Call other commands without model choice
             else:
@@ -193,5 +194,5 @@ class UserInterface:
 
 
 if __name__ == "__main__":
-    user = UserInterface(token=config.token, llama_model=config.model, sampleText=config.sampleText)
+    user = UserInterface(token=config.token, llama_model=config.model)
     user.userInput()

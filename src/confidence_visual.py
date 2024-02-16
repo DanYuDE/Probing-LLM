@@ -5,6 +5,7 @@ import dash
 from dash import Dash, html, dcc, Input, Output, State, callback
 import plotly.graph_objects as go
 import os
+import config
 
 sampleText = """<<SYS>>
 Role and goal: 
@@ -79,7 +80,7 @@ class DashApp:
         self.file_path = os.path.join(self.result_folder, self.csv_files[0]) if self.csv_files else None
         self.data = pd.read_csv(self.file_path) if self.file_path else pd.DataFrame()
         self.num_layers_per_set = 32
-        self.num_sets = len(self.data) // (self.num_layers_per_set + 1) if not self.data.empty else 0
+        self.num_sets = (len(self.data) + 1) // (self.num_layers_per_set + 1) if not self.data.empty else 0
         self.sentences = self.read_sentences('../files/question.txt')
         self.sampleText = sampleText
         self.setup_layout()
@@ -117,7 +118,10 @@ class DashApp:
             if selected_file is not None:
                 file_path = os.path.join(self.result_folder, selected_file)
                 self.data = pd.read_csv(file_path)  # Update the data
-                self.num_sets = len(self.data) // (self.num_layers_per_set + 1)
+                self.num_sets = (len(self.data) + 1) // (self.num_layers_per_set + 1)
+                print("data length: ", len(self.data))
+                print("Sets: ", self.num_sets)
+                print("Layers per set: ", self.num_layers_per_set)
                 # Reset set-selector options and value
                 return ([{'label': f'Set {i + 1}', 'value': i} for i in range(self.num_sets)], 0)
             # In case of None or error
@@ -144,7 +148,10 @@ class DashApp:
                                                       f"Attention Probing Visualization - Set {set_num + 1}")
             block_fig = self.create_interactive_heatmap(blockOutput, f"Block Output Visualization - Set {set_num + 1}")
 
-            sentence = self.sampleText.replace("{{inputText}}", self.sentences[set_num]) if set_num < len(
+            # Determine which text to display based on the selected file
+            print(selected_file)
+            displayed_text = config.testText if 'testText' in selected_file else config.sampleText
+            sentence = displayed_text.replace("{{inputText}}", self.sentences[set_num]) if set_num < len(
                 self.sentences) else "No sentence available."
 
             return html.Div(style={'display': 'flex', 'flex-direction': 'column'}, children=[
