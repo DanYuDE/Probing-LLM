@@ -23,11 +23,9 @@ class AttnWrapper(torch.nn.Module):
 
 
 class BlockOutputWrapper(torch.nn.Module):
-    def __init__(self, block, unembed_matrix, norm):
+    def __init__(self, block):
         super().__init__()
         self.block = block
-        self.unembed_matrix = unembed_matrix
-        self.norm = norm
 
         self.block.self_attn = AttnWrapper(self.block.self_attn)
         self.post_attention_layernorm = self.block.post_attention_layernorm

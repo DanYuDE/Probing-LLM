@@ -35,6 +35,9 @@ class UserInterface:
 
     def select_text(self):
         text_choice = input("Choose the selectedText to use - '1' for sampleText, '2' for testText: ").strip()
+        if text_choice not in ['1', '2']:
+            print("Invalid choice. Returning to main menu...")
+            return None, None
         return self.texts.get(text_choice, config.sampleText), "sampleText" if text_choice == '1' else "testText"  # Defaults to sampleText if choice is invalid
 
     def selectfile(self, operation, model_choice, textPar):
@@ -51,13 +54,13 @@ class UserInterface:
                               f" or 0 for default ({defaultinput}) or 'q' to return to main menu: ").lower()
             if inputfile == "q":
                 print("Return to main menu...")
-                return None
+                return None, None
             inputfile = defaultinput if inputfile == "0" else inputfile
 
         outputFile = input(f"Enter the output file name (including its path) or 0 for default ({defaultoutput}): ").lower()
         if outputFile == "q":
             print("Return to main menu...")
-            return None
+            return None, None
         outputFile = defaultoutput if outputFile == "0" else outputFile
 
         return inputfile, outputFile
@@ -83,6 +86,8 @@ class UserInterface:
         print("Please wait...")
 
         self.selectedText, textPar = self.select_text()
+        if self.selectedText is None:
+            return
         inputfile, outputfile = self.selectfile("1", model_choice, textPar)
         clear_csv(outputfile)
 
@@ -109,7 +114,11 @@ class UserInterface:
         print("Please wait...")
 
         self.selectedText, textPar = self.select_text()
+        if self.selectedText is None:
+            return
         inputfile, outputfile = self.selectfile("2", model_choice, textPar)
+        if inputfile is None or outputfile is None:
+            return
         clear_csv(outputfile)
 
         # Determine model based on choice

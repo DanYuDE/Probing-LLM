@@ -8,22 +8,32 @@ from tqdm import tqdm
 from ModelWrapperBase import BlockOutputWrapper
 
 class TunedLensBlockOutputWrapper(BlockOutputWrapper):
-    def __init__(self, block, unembed_matrix, norm):
-        super().__init__(block, unembed_matrix, norm)
+    def __init__(self, block):
+        super().__init__(block)
         self.attn_mech_output = None
         self.intermediate_res = None
         self.mlp_output = None
         self.block_output = None
 
     def forward(self, *args, **kwargs):
+        # output = self.block(*args, **kwargs)
+        # # Skip the unembedding and norm steps as they will be handled by TunedLens
+        # self.attn_mech_output = self.block.self_attn.activations
+        # attn_output = self.attn_mech_output
+        # self.intermediate_res = attn_output + args[0]
+        # mlp_output = self.block.mlp(self.post_attention_layernorm(self.intermediate_res))
+        # self.mlp_output = mlp_output
+        # self.block_output = self.mlp_output + self.intermediate_res
+        # return output
+
         output = self.block(*args, **kwargs)
-        # Skip the unembedding and norm steps as they will be handled by TunedLens
-        self.attn_mech_output = self.block.self_attn.activations
-        attn_output = self.attn_mech_output
-        self.intermediate_res = attn_output + args[0]
-        mlp_output = self.block.mlp(self.post_attention_layernorm(self.intermediate_res))
+        self.block_output = output[0]
+        attn_output = self.block.self_attn.activations
+        self.attn_mech_output = attn_output
+        attn_output += args[0]
+        self.intermediate_res = attn_output
+        mlp_output = self.block.mlp(self.post_attention_layernorm(attn_output))
         self.mlp_output = mlp_output
-        self.block_output = self.mlp_output + self.intermediate_res
         return output
 
 class Tuned_Llama2_Helper:
@@ -38,11 +48,11 @@ class Tuned_Llama2_Helper:
         for i, layer in tqdm(enumerate(self.model.model.layers), desc="Wrapping layers", total=len(self.model.model.layers)):
 
             # Initialize the unembed_matrix and norm for each BlockOutputWrapper
-            unembed_matrix = self.tuned_lens.layer_translators[i]
-            norm = self.model.model.norm
+            # unembed_matrix = self.tuned_lens.layer_translators[i]
+            # norm = self.model.model.norm
+
             # Wrap the original layer with BlockOutputWrapper
-            self.model.model.layers[i] = TunedLensBlockOutputWrapper(layer, unembed_matrix, norm)
-            # print(f"Layer {i} wrapped: {self.model.model.layers[i]}")
+            self.model.model.layers[i] = TunedLensBlockOutputWrapper(layer)
 
     def get_logits(self, prompt):
         inputs = self.tokenizer(prompt, return_tensors="pt")
@@ -80,12 +90,13 @@ class Tuned_Llama2_Helper:
                 dic[layer_key]['MLP output'].extend(self.decode_and_print_top_tokens(mlp_output, i))
             if print_block:
                 dic[layer_key]['Block output'].extend(self.decode_and_print_top_tokens(block_output, i))
+                # for i in range(len(dic[layer_key]['Block output'])):
+                #     print(dic[layer_key]['Block output'][i])
 
         write_to_csv(dic, filename)
 
     def decode_and_print_top_tokens(self, hidden_states, layer_idx):
-        logits = self.tuned_lens(hidden_states, layer_idx)
-        # print(logits)
+        logits = self.tuned_lens.forward(hidden_states, layer_idx)
         probs = torch.nn.functional.softmax(logits[0][-1], dim=-1)
         top_probs, top_indices = torch.topk(probs, 10, dim=-1)
         # print("top_indices", top_indices)
@@ -94,7 +105,7 @@ class Tuned_Llama2_Helper:
         # print(top_probs.shape)
         tokens = self.tokenizer.convert_ids_to_tokens(top_indices.squeeze().tolist())
         probabilities = top_probs.squeeze().tolist()
-        probs_percent = [round(v * 100, 2) for v in probabilities]
+        probs_percent = [int(v * 100) for v in probabilities]
         token_prob_pairs = list(zip(tokens, probs_percent))
         return token_prob_pairs
 

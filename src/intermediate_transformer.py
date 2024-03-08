@@ -9,7 +9,9 @@ from tqdm import tqdm
 
 class LogitBlockOutputWrapper(BlockOutputWrapper):
     def __init__(self, block, unembed_matrix, norm):
-        super().__init__(block, unembed_matrix, norm)
+        super().__init__(block)
+        self.unembed_matrix = unembed_matrix
+        self.norm = norm
         self.attn_mech_output_unembedded = None
         self.intermediate_res_unembedded = None
         self.mlp_output_unembedded = None

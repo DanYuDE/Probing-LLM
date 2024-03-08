@@ -265,6 +265,6 @@ class DashApp:
         self.app.run_server(debug=debug)
 
 # # Main execution
-if __name__ == '__main__':
-    my_dash_app = DashApp(sampleText)
-    my_dash_app.run()
+# if __name__ == '__main__':
+#     my_dash_app = DashApp(sampleText)
+#     my_dash_app.run()
