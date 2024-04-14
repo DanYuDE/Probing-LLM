@@ -47,12 +47,12 @@ class Llama7BHelper:
             logits = self.model(inputs.input_ids.to(self.device)).logits
             return logits
 
-    def set_add_attn_output(self, layer, add_output):
-        self.model.model.layers[layer].attn_add_tensor(add_output)
-
-    def get_attn_activations(self, layer):
-        layer_output = self.model.model.layers[layer].get_attn_activations()
-        return layer_output
+    # def set_add_attn_output(self, layer, add_output):
+    #     self.model.model.layers[layer].attn_add_tensor(add_output)
+    #
+    # def get_attn_activations(self, layer):
+    #     layer_output = self.model.model.layers[layer].get_attn_activations()
+    #     return layer_output
 
     def reset_all(self):
         for layer in self.model.model.layers:
@@ -61,11 +61,8 @@ class Llama7BHelper:
     def print_decoded_activations(self, decoded_activations, label):
         softmaxed = torch.nn.functional.softmax(decoded_activations[0][-1], dim=-1)
         values, indices = torch.topk(softmaxed, 10)
-        # print("values", values)
-        # print(values.shape)
-        # print("indices", indices)
-        # print(indices.shape)
-        probs_percent = [int(v * 100) for v in values.tolist()]
+
+        probs_percent = [round(v * 100, 2) for v in values.tolist()]
         tokens = self.tokenizer.batch_decode(indices.unsqueeze(-1))
 
         # Convert to list for CSV writing
@@ -77,7 +74,6 @@ class Llama7BHelper:
         self.get_logits(prompt)
         dic = {}
         for i, layer in tqdm(enumerate(self.model.model.layers), desc="Processing layers", total=len(self.model.model.layers), leave=False):
-            # print(f'Layer {i}: Decoded intermediate outputs')
             layer_key = f'layer{i}'
             if layer_key not in dic:
                 dic[layer_key] = {

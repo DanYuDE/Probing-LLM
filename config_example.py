@@ -31,7 +31,13 @@ Now you can start to answer the question with given options to give the correct 
 [INST] Input: {{inputText}}[/INST]
 Output: The correct answer is """
 
-
+# The prompt template for the first turn looks like this:
+#
+# <s>[INST] <<SYS>>
+# {{ system_prompt }}
+# <</SYS>>
+#
+# {{ user_message }} [/INST]
 
 
 testText ="""<<SYS>>
