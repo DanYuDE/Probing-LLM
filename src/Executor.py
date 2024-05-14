@@ -25,11 +25,10 @@ class UserInterface:
         self.commands = {
             "1": self.logit_lens,
             "2": self.tuned_lens,
-            "3": self.other_probing,
-            "4": self.visualization,
+            "3": self.visualization,
             "sd": self.shutdown
         }
-        self.descriptions = ["1. Logit-Lens", "2. Tuned-Lens", "3. Other probing methods", "4. Visualization", "quit (Q or q)"]
+        self.descriptions = ["1. Logit-Lens", "2. Tuned-Lens", "3. Visualization", "quit (Q or q)"]
         self.model_choices = ["1. meta-llama/Llama-2-7b-hf", "2. meta-llama/Llama-2-7b-chat-hf", "quit(Q or q)"]
         self.dash_app_running = False
 
@@ -139,10 +138,6 @@ class UserInterface:
             print(f"Time taken: {endTime} seconds")
 
         model.reset_all()
-
-    def other_probing(self):
-        print("other_probing selected")
-        print("Please wait...")
 
     def visualization(self):
         print("visualization selected")

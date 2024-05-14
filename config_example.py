@@ -4,9 +4,9 @@ model = ['meta-llama/Llama-2-7b-hf',
          # other large language models here
         ]
 
-sampleText = """<<SYS>>
+sampleText = """<s>[INST] <<SYS>>
 Role and goal: 
-Your role is to act as an intelligent problem-solver, tasked with selecting the correct answer from a set of multiple-choice options. Your goal is to carefully analyze the question and each of the provided options, applying your extensive knowledge base and reasoning skills to determine the most accurate and appropriate answer.
+Your role is to act as an intelligent problem-solver, tasked with selecting the correct answer from a set of multiple-choice options. Your goal is to analyze the question carefully and each of the provided options, applying your extensive knowledge base and reasoning skills to determine the most accurate and appropriate answer.
 
 Context:
 The input text is a question with multiple-choice options. The correct answer is indicated by the option label A, B, C, or D.
@@ -28,7 +28,7 @@ Output: The correct answer is {one of A, B, C, D} // you will output the correct
 Now you can start to answer the question with given options to give the correct answer.
 <</SYS>>
 
-[INST] Input: {{inputText}}[/INST]
+Input: {{inputText}}[/INST]
 Output: The correct answer is """
 
 # The prompt template for the first turn looks like this:
