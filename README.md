@@ -21,7 +21,6 @@ interpretable features.
 - **OS:** MacOS 14.2.1 (Linux and Windows should work as well, but not tested yet)
 - **Python Version:** 3.10
 - **Framework:** Pytorch
-- **Python Packages:** transformers, pandas, tqdm, numpy, dash, torch
 
 ### Installing
 
